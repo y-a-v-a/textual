@@ -32,7 +32,7 @@ applies styling through environment values, and uses SwiftUI's layout system to 
 - **Inline attachments** that flow with the text, such as images and custom emoji
 - **Math expressions** rendered as inline or block attachments
 - **Animated image support** (GIF, APNG, WebP)
-- **Syntax highlighting** with customizable themes
+- **Syntax highlighting** with customizable themes, including a synchronous mode for offscreen rendering
 - **Comprehensive styling** for headings, code blocks, tables, links, lists, and more
 - **Font-relative** layout measurements that scale with text size and accessibility settings
 
@@ -157,6 +157,21 @@ StructuredText(
 
 Scrollable regions like code blocks handle their own selection contexts. When you select text in a scrollable area,
 any document-level selection clears automatically, and vice versa.
+
+### Offscreen Rendering
+
+Code blocks are tokenized asynchronously so that scrolling stays smooth. Offscreen renderers —
+`ImageRenderer`, PDF export, printing — draw before that work can finish, so code comes out
+uncolored. Switch to synchronous highlighting for those cases:
+
+```swift
+StructuredText(markdown: markdown)
+  .textual.syntaxHighlightingMode(.synchronous)
+```
+
+In this mode, code blocks are highlighted while the view body is evaluated, so the very first
+drawn frame is already colored. Tokenization runs on the main actor, so keep the default
+`.asynchronous` mode for content that is on screen.
 
 ### Styling
 

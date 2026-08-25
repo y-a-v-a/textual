@@ -241,6 +241,22 @@ extension TextualNamespace where Base: View {
     base.environment(\.highlighterTheme, highlighterTheme)
   }
 
+  /// Sets the syntax highlighting mode used by code blocks in ``StructuredText``.
+  ///
+  /// Use ``SyntaxHighlightingMode/synchronous`` when rendering offscreen, so that code
+  /// blocks are already highlighted on the first drawing pass.
+  ///
+  /// ```swift
+  /// let renderer = ImageRenderer(
+  ///   content: StructuredText(markdown: markdown)
+  ///     .textual.syntaxHighlightingMode(.synchronous)
+  /// )
+  /// ```
+  @inlinable
+  public func syntaxHighlightingMode(_ mode: SyntaxHighlightingMode) -> some View {
+    base.environment(\.syntaxHighlightingMode, mode)
+  }
+
   /// Sets the code block style used by ``StructuredText``.
   @inlinable
   public func codeBlockStyle(
