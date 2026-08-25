@@ -20,14 +20,18 @@ extension AttributedStringProtocol {
     uniqueValues(for: \.textual.attachment)
   }
 
-  /// Collects the attachments and whether any run carries a link, in a single pass over the runs.
+  /// Collects the attachments, and whether any run carries a link or a text run effect, in a
+  /// single pass over the runs.
   ///
-  /// Fragment-level overlays need both values on every body pass, and walking the runs once
-  /// rather than once per lookup keeps that cost proportional to the fragment, not to the
-  /// number of things asking about it.
-  func attachmentsAndLinks() -> (attachments: Set<AnyAttachment>, hasLinks: Bool) {
+  /// Fragment-level overlays and the effect renderer need these values on every body pass, and
+  /// walking the runs once rather than once per lookup keeps that cost proportional to the
+  /// fragment, not to the number of things asking about it.
+  func inlineFeatures() -> (
+    attachments: Set<AnyAttachment>, hasLinks: Bool, hasTextRunEffects: Bool
+  ) {
     var attachments: Set<AnyAttachment> = []
     var hasLinks = false
+    var hasTextRunEffects = false
 
     for run in runs {
       if let attachment = run.attributes[keyPath: \.textual.attachment] {
@@ -36,9 +40,12 @@ extension AttributedStringProtocol {
       if run.attributes[keyPath: \.link] != nil {
         hasLinks = true
       }
+      if run.attributes[keyPath: \.textual.textRunEffect] != nil {
+        hasTextRunEffects = true
+      }
     }
 
-    return (attachments, hasLinks)
+    return (attachments, hasLinks, hasTextRunEffects)
   }
 
   func containsValues<T>(for keyPaths: Set<KeyPath<AttributeContainer, T?>>) -> Bool {

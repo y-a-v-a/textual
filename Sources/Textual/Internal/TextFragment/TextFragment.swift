@@ -32,12 +32,14 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   private let content: Content
   private let attachments: Set<AnyAttachment>
   private let hasLinks: Bool
+  private let hasTextRunEffects: Bool
 
   init(_ content: Content) {
     self.content = content
-    // Both are needed on every body pass to decide which fragment-level overlays to install.
-    // Resolve them in a single scan over the runs instead of one scan per lookup.
-    (self.attachments, self.hasLinks) = content.attachmentsAndLinks()
+    // All three are needed on every body pass to decide which fragment-level overlays and
+    // renderers to install. Resolve them in a single scan over the runs instead of one scan per
+    // lookup.
+    (self.attachments, self.hasLinks, self.hasTextRunEffects) = content.inlineFeatures()
   }
 
   var body: some View {
@@ -46,9 +48,9 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
       // recomputed as the container resizes. Installing the observer on every fragment adds a
       // geometry node per block, which is the dominant cost in a large document.
       if attachments.isEmpty {
-        text
+        textView
       } else {
-        text
+        textView
           .onGeometryChange(for: CGSize?.self, of: \.textContainerSize) { size in
             guard let size, let textBuilder else { return }
             textBuilder.sizeChanged(size, environment: textEnvironment)
@@ -61,6 +63,17 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
     .modifier(TextSelectionBackground())
     .modifier(AttachmentOverlay(attachments: attachments))
     .modifier(TextLinkInteraction(hasLinks: hasLinks))
+  }
+
+  // The custom renderer is installed only where it earns its place. Fragments without effects
+  // keep SwiftUI's own text rendering path, so nothing about how the rest of a document draws
+  // depends on a feature it does not use.
+  @ViewBuilder private var textView: some View {
+    if hasTextRunEffects {
+      text.textRenderer(TextRunEffectRenderer())
+    } else {
+      text
+    }
   }
 
   private var text: Text {

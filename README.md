@@ -34,6 +34,7 @@ applies styling through environment values, and uses SwiftUI's layout system to 
 - **Animated image support** (GIF, APNG, WebP)
 - **Syntax highlighting** with customizable themes, including a synchronous mode for offscreen rendering
 - **Task lists** rendered as checkboxes, with a customizable marker
+- **Custom text run effects** drawn behind or in front of the glyphs with `GraphicsContext`
 - **Comprehensive styling** for headings, code blocks, tables, links, lists, and more
 - **Font-relative** layout measurements that scale with text size and accessibility settings
 
@@ -158,6 +159,45 @@ StructuredText(
 
 Scrollable regions like code blocks handle their own selection contexts. When you select text in a scrollable area,
 any document-level selection clears automatically, and vice versa.
+
+### Custom Text Effects
+
+When the standard text attributes are not enough — a highlight behind a search match, a
+hand-drawn underline, a cross-out — conform to `TextRunEffect` and draw the run yourself:
+
+```swift
+struct HighlightEffect: TextRunEffect {
+  var color: Color
+
+  func draw(_ run: Text.Layout.Run, in context: inout GraphicsContext) {
+    context.fill(
+      Path(roundedRect: run.typographicBounds.rect, cornerRadius: 3),
+      with: .color(color)
+    )
+  }
+}
+
+InlineText(markdown: "This is **highlighted** text")
+  .textual.inlineStyle(
+    InlineStyle().strong(.bold, .textRunEffect(HighlightEffect(color: .yellow)))
+  )
+```
+
+Textual draws a fragment in three passes: every `.behind` effect, then all of the text, then
+every `.inFront` effect. Pass `placement: .inFront` for effects that belong over the glyphs:
+
+```swift
+InlineStyle().strikethrough(.textRunEffect(CrossOutEffect(color: .red), placement: .inFront))
+```
+
+To decorate ranges that do not correspond to a markup span — search results, for example — set
+the attribute on the attributed string instead:
+
+```swift
+attributedString[range].textual.textRunEffect = AnyTextRunEffect(
+  HighlightEffect(color: .yellow)
+)
+```
 
 ### Task Lists
 

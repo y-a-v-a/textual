@@ -80,8 +80,9 @@ extension Text {
     for run in attributedString.runs {
       let link = run.link
       let attachment = run.textual.attachment
+      let effect = run.textual.textRunEffect
 
-      guard link != nil || attachment != nil else {
+      guard link != nil || attachment != nil || effect != nil else {
         // Extend the pending plain span instead of emitting a `Text` for this run.
         plainRange = (plainRange?.lowerBound ?? run.range.lowerBound)..<run.range.upperBound
         continue
@@ -115,6 +116,11 @@ extension Text {
       // Add link attribute for TextLinkInteraction
       if let link {
         text = text.customAttribute(LinkAttribute(link))
+      }
+
+      // Add effect attribute for TextRunEffectRenderer
+      if let effect {
+        text = text.customAttribute(TextRunEffectAttribute(effect))
       }
 
       textValues.append(text)

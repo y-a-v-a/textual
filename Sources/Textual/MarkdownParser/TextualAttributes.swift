@@ -18,11 +18,22 @@ extension AttributeScopes {
       public static let name = "Textual.EmojiURL"
     }
 
+    /// Stores a custom drawing effect in attributed content.
+    ///
+    /// Set this attribute on a range to decorate it with a ``TextRunEffect``.
+    public enum TextRunEffectAttribute: AttributedStringKey {
+      public typealias Value = AnyTextRunEffect
+      public static let name = "Textual.TextRunEffect"
+    }
+
     /// A property for accessing an attachment attribute.
     public let attachment: AttachmentAttribute
 
     /// A property for accessing an emoji URL attribute.
     public let emojiURL: EmojiURLAttribute
+
+    /// A property for accessing a text run effect attribute.
+    public let textRunEffect: TextRunEffectAttribute
 
     public let foundation: AttributeScopes.FoundationAttributes
   }
