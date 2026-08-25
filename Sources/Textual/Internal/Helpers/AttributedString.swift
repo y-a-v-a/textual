@@ -20,6 +20,27 @@ extension AttributedStringProtocol {
     uniqueValues(for: \.textual.attachment)
   }
 
+  /// Collects the attachments and whether any run carries a link, in a single pass over the runs.
+  ///
+  /// Fragment-level overlays need both values on every body pass, and walking the runs once
+  /// rather than once per lookup keeps that cost proportional to the fragment, not to the
+  /// number of things asking about it.
+  func attachmentsAndLinks() -> (attachments: Set<AnyAttachment>, hasLinks: Bool) {
+    var attachments: Set<AnyAttachment> = []
+    var hasLinks = false
+
+    for run in runs {
+      if let attachment = run.attributes[keyPath: \.textual.attachment] {
+        attachments.insert(attachment)
+      }
+      if run.attributes[keyPath: \.link] != nil {
+        hasLinks = true
+      }
+    }
+
+    return (attachments, hasLinks)
+  }
+
   func containsValues<T>(for keyPaths: Set<KeyPath<AttributeContainer, T?>>) -> Bool {
     runs.contains { run in
       keyPaths.first { keyPath in

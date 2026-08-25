@@ -17,17 +17,24 @@ struct AttachmentOverlay: ViewModifier {
   }
 
   func body(content: Content) -> some View {
-    content
-      .overlayPreferenceValue(Text.LayoutKey.self) { value in
-        if let anchoredLayout = value.first {
-          GeometryReader { geometry in
-            AttachmentView(
-              attachments: attachments,
-              origin: geometry[anchoredLayout.origin],
-              layout: anchoredLayout.layout
-            )
+    // Reading `Text.LayoutKey` forces SwiftUI to resolve the fragment’s text layout and publish
+    // it as an anchored preference. Most fragments carry no attachments, so skip the reader
+    // entirely rather than paying that cost per fragment.
+    if attachments.isEmpty {
+      content
+    } else {
+      content
+        .overlayPreferenceValue(Text.LayoutKey.self) { value in
+          if let anchoredLayout = value.first {
+            GeometryReader { geometry in
+              AttachmentView(
+                attachments: attachments,
+                origin: geometry[anchoredLayout.origin],
+                layout: anchoredLayout.layout
+              )
+            }
           }
         }
-      }
+    }
   }
 }

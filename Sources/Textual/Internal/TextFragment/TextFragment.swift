@@ -30,28 +30,42 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   @State private var textBuilder: TextBuilder?
 
   private let content: Content
+  private let attachments: Set<AnyAttachment>
+  private let hasLinks: Bool
 
   init(_ content: Content) {
     self.content = content
+    // Both are needed on every body pass to decide which fragment-level overlays to install.
+    // Resolve them in a single scan over the runs instead of one scan per lookup.
+    (self.attachments, self.hasLinks) = content.attachmentsAndLinks()
   }
 
   var body: some View {
-    text
-      .customAttribute(TextFragmentAttribute())
-      .onGeometryChange(for: CGSize?.self, of: \.textContainerSize) { size in
-        guard let size, let textBuilder else { return }
-        textBuilder.sizeChanged(size, environment: textEnvironment)
+    Group {
+      // Observing the container size only matters for attachments, whose placeholder sizes are
+      // recomputed as the container resizes. Installing the observer on every fragment adds a
+      // geometry node per block, which is the dominant cost in a large document.
+      if attachments.isEmpty {
+        text
+      } else {
+        text
+          .onGeometryChange(for: CGSize?.self, of: \.textContainerSize) { size in
+            guard let size, let textBuilder else { return }
+            textBuilder.sizeChanged(size, environment: textEnvironment)
+          }
       }
-      .onChange(of: content, initial: true) { _, newValue in
-        self.textBuilder = TextBuilder(newValue, environment: textEnvironment)
-      }
-      .modifier(TextSelectionBackground())
-      .modifier(AttachmentOverlay(attachments: content.attachments()))
-      .modifier(TextLinkInteraction())
+    }
+    .onChange(of: content, initial: true) { _, newValue in
+      self.textBuilder = TextBuilder(newValue, environment: textEnvironment)
+    }
+    .modifier(TextSelectionBackground())
+    .modifier(AttachmentOverlay(attachments: attachments))
+    .modifier(TextLinkInteraction(hasLinks: hasLinks))
   }
 
   private var text: Text {
-    textBuilder?.text ?? Text(verbatim: "")
+    // The marker identifies this fragment to any `Text.Layout` consumer, so it is always applied.
+    (textBuilder?.text ?? Text(verbatim: "")).customAttribute(TextFragmentAttribute())
   }
 }
 
