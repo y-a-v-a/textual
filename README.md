@@ -33,6 +33,7 @@ applies styling through environment values, and uses SwiftUI's layout system to 
 - **Math expressions** rendered as inline or block attachments
 - **Animated image support** (GIF, APNG, WebP)
 - **Syntax highlighting** with customizable themes, including a synchronous mode for offscreen rendering
+- **Task lists** rendered as checkboxes, with a customizable marker
 - **Comprehensive styling** for headings, code blocks, tables, links, lists, and more
 - **Font-relative** layout measurements that scale with text size and accessibility settings
 
@@ -157,6 +158,29 @@ StructuredText(
 
 Scrollable regions like code blocks handle their own selection contexts. When you select text in a scrollable area,
 any document-level selection clears automatically, and vice versa.
+
+### Task Lists
+
+A list item whose text starts with `[ ]`, `[x]`, or `[X]` renders as a checkbox, following
+GitHub-flavored Markdown:
+
+```swift
+StructuredText(
+  markdown: """
+    - [x] Pick a date
+    - [ ] Book the hotel
+    """
+)
+```
+
+Checkboxes are display only. Use the `textual.taskListMarker(_:)` modifier to change the symbols:
+
+```swift
+StructuredText(markdown: markdown)
+  .textual.taskListMarker(
+    .checkbox(incompleteSymbolName: "circle", completeSymbolName: "checkmark.circle.fill")
+  )
+```
 
 ### Offscreen Rendering
 

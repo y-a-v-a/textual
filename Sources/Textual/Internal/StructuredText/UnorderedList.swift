@@ -36,6 +36,7 @@ extension StructuredText {
   fileprivate struct UnorderedListItem: View {
     @Environment(\.listItemStyle) private var listItemStyle
     @Environment(\.unorderedListMarker) private var unorderedListMarker
+    @Environment(\.taskListMarker) private var taskListMarker
 
     private let intent: PresentationIntent.IntentType?
     private let content: AttributedSubstring
@@ -49,12 +50,15 @@ extension StructuredText {
     }
 
     var body: some View {
+      // A task list item renders a checkbox in place of the bullet, and drops the `[ ]` marker
+      // from the text it displays
+      let taskListItem = content.taskListItem
       let configuration = ListItemStyleConfiguration(
-        marker: .init(marker),
+        marker: .init(marker(for: taskListItem)),
         block: .init(
           BlockContent(
             parent: intent,
-            content: content
+            content: taskListItem?.content ?? content
           )
         ),
         indentationLevel: indentationLevel
@@ -64,14 +68,25 @@ extension StructuredText {
       AnyView(resolvedStyle)
     }
 
-    private var marker: some View {
-      AnyView(
-        unorderedListMarker.resolve(
-          configuration: .init(
-            indentationLevel: indentationLevel
+    private func marker(for taskListItem: TaskListItem?) -> some View {
+      if let taskListItem {
+        AnyView(
+          taskListMarker.resolve(
+            configuration: .init(
+              indentationLevel: indentationLevel,
+              isCompleted: taskListItem.isCompleted
+            )
           )
         )
-      )
+      } else {
+        AnyView(
+          unorderedListMarker.resolve(
+            configuration: .init(
+              indentationLevel: indentationLevel
+            )
+          )
+        )
+      }
     }
 
     private var indentationLevel: Int {

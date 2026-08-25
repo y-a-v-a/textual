@@ -14,6 +14,8 @@ extension StructuredText {
     associatedtype ListItemStyle: StructuredText.ListItemStyle
     associatedtype UnorderedListMarker: StructuredText.UnorderedListMarker
     associatedtype OrderedListMarker: StructuredText.OrderedListMarker
+    associatedtype TaskListMarker: StructuredText.TaskListMarker = StructuredText
+      .SymbolTaskListMarker
     associatedtype TableStyle: StructuredText.TableStyle
     associatedtype TableCellStyle: StructuredText.TableCellStyle
     associatedtype ThematicBreakStyle: StructuredText.ThematicBreakStyle
@@ -34,6 +36,8 @@ extension StructuredText {
     var unorderedListMarker: UnorderedListMarker { get }
     /// The marker used for ordered lists.
     var orderedListMarker: OrderedListMarker { get }
+    /// The marker used for task list items.
+    var taskListMarker: TaskListMarker { get }
     /// The style used for tables.
     var tableStyle: TableStyle { get }
     /// The style used for individual table cells.
@@ -41,4 +45,9 @@ extension StructuredText {
     /// The style used for thematic breaks.
     var thematicBreakStyle: ThematicBreakStyle { get }
   }
+}
+
+extension StructuredText.Style where TaskListMarker == StructuredText.SymbolTaskListMarker {
+  /// The default checkbox marker used for task list items.
+  public var taskListMarker: StructuredText.SymbolTaskListMarker { .checkbox }
 }
