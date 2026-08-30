@@ -2,10 +2,23 @@
   import SwiftUI
 
   final class LiveTextLayoutCollection: TextLayoutCollection {
-    private(set) lazy var layouts: [any TextLayout] = makeLayouts()
+    var layouts: [any TextLayout] {
+      if let materializedLayouts {
+        return materializedLayouts
+      }
+      let layouts = makeLayouts()
+      materializedLayouts = layouts
+      return layouts
+    }
 
-    private let base: Text.LayoutKey.Value
-    private let geometry: GeometryProxy
+    // The text-fragment layouts without their origins. Materializing lines, runs and slices is
+    // expensive, so equality of this identity decides whether a published collection carries new
+    // text layouts or just new origins for the ones already materialized.
+    private lazy var layoutIdentity: [Text.Layout] = anchoredTextFragments.map(\.layout)
+
+    private var materializedLayouts: [any TextLayout]?
+    private var base: Text.LayoutKey.Value
+    private var geometry: GeometryProxy
 
     init(base: Text.LayoutKey.Value, geometry: GeometryProxy) {
       self.base = base
@@ -18,7 +31,25 @@
 
     func needsPositionReconciliation(with other: any TextLayoutCollection) -> Bool {
       // Same layouts with different origins do not need position reconciliation
-      base.map(\.layout) != (other as? LiveTextLayoutCollection)?.base.map(\.layout)
+      layoutIdentity != (other as? LiveTextLayoutCollection)?.layoutIdentity
+    }
+
+    func adoptOrigins(from other: any TextLayoutCollection) {
+      // Expects `other` to carry the same layouts; only their origins are taken over
+      guard let other = other as? LiveTextLayoutCollection else {
+        return
+      }
+
+      base = other.base
+      geometry = other.geometry
+
+      guard let materializedLayouts else {
+        return
+      }
+
+      for (layout, anchoredLayout) in zip(materializedLayouts, anchoredTextFragments) {
+        (layout as? LiveTextLayout)?.origin = geometry[anchoredLayout.origin]
+      }
     }
 
     func index(of layout: Text.Layout) -> Int? {
@@ -27,16 +58,18 @@
       }
     }
 
+    private var anchoredTextFragments: [Text.LayoutKey.AnchoredLayout] {
+      // We are only interested in text fragments
+      base.filter(\.layout.isTextFragment)
+    }
+
     private func makeLayouts() -> [any TextLayout] {
-      base
-        // We are only interested in text fragments
-        .filter(\.layout.isTextFragment)
-        .map { anchoredLayout in
-          LiveTextLayout(
-            anchoredLayout: anchoredLayout,
-            geometry: geometry
-          )
-        }
+      anchoredTextFragments.map { anchoredLayout in
+        LiveTextLayout(
+          anchoredLayout: anchoredLayout,
+          geometry: geometry
+        )
+      }
     }
   }
 
@@ -45,7 +78,7 @@
       joinedAttributedString.joined
     }
 
-    let origin: CGPoint
+    var origin: CGPoint
 
     private(set) lazy var bounds: CGRect = makeBounds()
     private(set) lazy var lines: [any TextLine] = makeLines()
