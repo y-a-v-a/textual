@@ -20,6 +20,46 @@ Six findings implemented on `feature/text-run-effects` (one commit each):
 | §1.2 blockRuns/inlineFeatures per body eval | `48cda68` | `Memo` @State cache; Table memoizes rows+columns together |
 | §3 streaming re-parse | `0a2220b` | 50 ms leading-edge throttle; the incremental block parser remains open |
 
+### Benchmark results (2026-08-30)
+
+`Tests/TextualTests/Benchmarks/TextualBenchmarks.swift`, run with:
+
+```
+PACKAGE_RESOURCE_BUNDLE_PATH="$PWD/.build/arm64-apple-macosx/debug" \
+  swift test --no-parallel --filter TextualBenchmarks
+```
+
+(That env var also fixes the 7 "environmental" highlighting test failures under plain
+`swift test` — the resource bundle just isn't found without it.)
+
+79 KB prose document (120 sections), macOS debug build, two runs per side.
+Baseline = `bcd4a3c` (before the six fixes), fixed = `867c2a8`.
+
+| Scenario | Baseline | Fixed | Change |
+| --- | --- | --- | --- |
+| initial-render (warm iters) | 1330–1439 ms | 1356–1459 ms | parity |
+| initial-render, selection on | 1969–2316 ms | 2014–2278 ms | parity |
+| streaming 80 chunks, feed | 10 895 / 10 958 ms | 662 / 659 ms | **16.6× faster** |
+| streaming 80 chunks, total | 11 600 / 11 685 ms | 1378 / 1360 ms | **8.5× faster** |
+| streaming 40 chunks of code, feed | 1078 ms | 359 ms | **3.0× faster** |
+| spacing churn ×16 | 3061–3088 ms | 3115–3173 ms | parity |
+| spacing churn ×16, selection on | 3837–3914 ms | 3862–3935 ms | parity |
+| tokenizer, 40 snippets, 2nd pass | 9.4 / 9.8 ms | 0.3 / 0.4 ms | **~27× faster** |
+
+Interpretation:
+- **§3 throttle is the measured headline** — the streaming scenarios are upstream #47's
+  exact shape and improve by an order of magnitude; initial render pays nothing.
+- **§4.1 token cache** shows in the repeat-tokenization micro (~27×) and the code
+  streaming feed (3×). Insight from the numbers: a warmed Prism call is sub-millisecond —
+  the ~1.8 s first pass is bundle eval + JIT warm-up, i.e. the still-open §4.2 finding.
+- **§2.1/§2.2 don't show here**: the harness drives no selection queries, and the
+  discarded collections were lazy, so the baseline's rebuilds cost nothing until a
+  hit-test follows a reflow. Measuring them needs real drag/hover events (Instruments on
+  the demo app). The selection-enabled scenarios confirm no regression.
+- **§1.2 memoization and §2e hashing** are below this harness's noise floor (churn is
+  dominated by relayout; no animated images in the fixture). Parity confirms no
+  regression.
+
 Not yet done from the top tiers: the remaining §0 quick wins, §2.3 prefix sums,
 §4.2 Prism off-main warm-up, §4.3 GIF timeline, §1.1 AnyView de-duplication, §1.3
 intent-identity ForEach ids, and the benchmark harness.
