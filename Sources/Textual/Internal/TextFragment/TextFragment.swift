@@ -29,28 +29,30 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   @Environment(\.textEnvironment) private var textEnvironment
   @State private var textBuilder: TextBuilder?
 
+  // All three features are needed on every body pass to decide which fragment-level overlays
+  // and renderers to install. They are resolved in a single scan over the runs, memoized so
+  // the scan happens per content change rather than per body evaluation.
+  @State private var inlineFeatures = Memo<Content, InlineFeatures>()
+
   private let content: Content
-  private let attachments: Set<AnyAttachment>
-  private let hasLinks: Bool
-  private let hasTextRunEffects: Bool
 
   init(_ content: Content) {
     self.content = content
-    // All three are needed on every body pass to decide which fragment-level overlays and
-    // renderers to install. Resolve them in a single scan over the runs instead of one scan per
-    // lookup.
-    (self.attachments, self.hasLinks, self.hasTextRunEffects) = content.inlineFeatures()
   }
 
   var body: some View {
+    let (attachments, hasLinks, hasTextRunEffects) = inlineFeatures(content) {
+      content.inlineFeatures()
+    }
+
     Group {
       // Observing the container size only matters for attachments, whose placeholder sizes are
       // recomputed as the container resizes. Installing the observer on every fragment adds a
       // geometry node per block, which is the dominant cost in a large document.
       if attachments.isEmpty {
-        textView
+        textView(hasTextRunEffects: hasTextRunEffects)
       } else {
-        textView
+        textView(hasTextRunEffects: hasTextRunEffects)
           .onGeometryChange(for: CGSize?.self, of: \.textContainerSize) { size in
             guard let size, let textBuilder else { return }
             textBuilder.sizeChanged(size, environment: textEnvironment)
@@ -68,7 +70,7 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   // The custom renderer is installed only where it earns its place. Fragments without effects
   // keep SwiftUI's own text rendering path, so nothing about how the rest of a document draws
   // depends on a feature it does not use.
-  @ViewBuilder private var textView: some View {
+  @ViewBuilder private func textView(hasTextRunEffects: Bool) -> some View {
     if hasTextRunEffects {
       text.textRenderer(TextRunEffectRenderer())
     } else {
@@ -81,6 +83,10 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
     (textBuilder?.text ?? Text(verbatim: "")).customAttribute(TextFragmentAttribute())
   }
 }
+
+private typealias InlineFeatures = (
+  attachments: Set<AnyAttachment>, hasLinks: Bool, hasTextRunEffects: Bool
+)
 
 struct TextFragmentAttribute: TextAttribute {
 }

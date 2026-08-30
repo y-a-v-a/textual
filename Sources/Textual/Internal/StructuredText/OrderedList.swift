@@ -13,6 +13,9 @@ extension StructuredText {
 
     @State private var markerWidth: CGFloat?
 
+    @State private var blockRuns =
+      Memo<Tuple<AttributedSubstring, PresentationIntent.IntentType?>, AttributedString.BlockRuns>()
+
     private let intent: PresentationIntent.IntentType?
     private let content: AttributedSubstring
 
@@ -22,7 +25,9 @@ extension StructuredText {
     }
 
     var body: some View {
-      let runs = content.blockRuns(parent: intent)
+      let runs = blockRuns(Tuple(content, intent)) {
+        content.blockRuns(parent: intent)
+      }
 
       BlockVStack {
         ForEach(runs.indices, id: \.self) { index in

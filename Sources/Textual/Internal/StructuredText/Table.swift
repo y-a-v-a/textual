@@ -13,6 +13,11 @@ extension StructuredText {
 
     @State private var spacing = TableCell.Spacing()
 
+    // The label is rebuilt whenever the cell-spacing preference lands, so the row and column
+    // decomposition is memoized rather than derived per evaluation
+    @State private var rows =
+      Memo<Tuple<AttributedSubstring, PresentationIntent.IntentType?>, [Row]>()
+
     private let intent: PresentationIntent.IntentType?
     private let content: AttributedSubstring
     private let columns: [PresentationIntent.TableColumn]
@@ -42,18 +47,23 @@ extension StructuredText {
 
     @ViewBuilder
     private var label: some View {
-      let rowRuns = content.blockRuns(parent: intent)
+      let rows = rows(Tuple(content, intent)) {
+        content.blockRuns(parent: intent).map { rowRun in
+          Row(
+            content: content[rowRun.range],
+            columnRuns: content[rowRun.range].blockRuns(parent: rowRun.intent)
+          )
+        }
+      }
 
       Grid(horizontalSpacing: spacing.horizontal, verticalSpacing: spacing.vertical) {
-        ForEach(rowRuns.indices, id: \.self) { rowIndex in
-          let rowRun = rowRuns[rowIndex]
-          let rowContent = content[rowRun.range]
-          let columnRuns = rowContent.blockRuns(parent: rowRun.intent)
+        ForEach(rows.indices, id: \.self) { rowIndex in
+          let row = rows[rowIndex]
 
           GridRow {
-            ForEach(columnRuns.indices, id: \.self) { columnIndex in
-              let cellRun = columnRuns[columnIndex]
-              let cellContent = rowContent[cellRun.range]
+            ForEach(row.columnRuns.indices, id: \.self) { columnIndex in
+              let cellRun = row.columnRuns[columnIndex]
+              let cellContent = row.content[cellRun.range]
 
               TableCell(cellContent, row: rowIndex, column: columnIndex)
                 .gridColumnAlignment(alignment(for: columnIndex))
@@ -61,6 +71,11 @@ extension StructuredText {
           }
         }
       }
+    }
+
+    struct Row {
+      let content: AttributedSubstring
+      let columnRuns: AttributedString.BlockRuns
     }
 
     private var indentationLevel: Int {
