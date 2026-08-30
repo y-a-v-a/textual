@@ -7,6 +7,25 @@ Analyzed 2026-08-29 on the `feature/text-run-effects` stack (includes
 [#77](https://github.com/gonzalezreal/textual/issues/77) ("onChange(of: AnyTextLayoutCollection)
 tried to update multiple times per frame").
 
+## Implementation status (2026-08-30)
+
+Six findings implemented on `feature/text-run-effects` (one commit each):
+
+| Finding | Commit | Notes |
+| --- | --- | --- |
+| §2.1 origin-only invalidation storm | `6ccd402` | Origins adopted in place; materialized layouts survive reflow |
+| §2.2 O(F²) `index(of:)` | `339248b` | Reverse map behind a derived-hash key (`Text.Layout` isn't Hashable) |
+| §4.1 async tokenizer cache | `3175be7` | `CodeTokenCache` shared by both modes; cache hits skip the placeholder flash |
+| §0/§2e GIF-frame attachment hashing | `4a4cbf6` | Custom `Image.hash` over first-frame identity, consistent with `==` |
+| §1.2 blockRuns/inlineFeatures per body eval | `48cda68` | `Memo` @State cache; Table memoizes rows+columns together |
+| §3 streaming re-parse | `0a2220b` | 50 ms leading-edge throttle; the incremental block parser remains open |
+
+Not yet done from the top tiers: the remaining §0 quick wins, §2.3 prefix sums,
+§4.2 Prism off-main warm-up, §4.3 GIF timeline, §1.1 AnyView de-duplication, §1.3
+intent-identity ForEach ids, and the benchmark harness.
+
+---
+
 **Vocabulary**: F = fragments (paragraph/list item/table cell), R = attributed runs,
 L = wrapped lines. For a 91 KB README: F ≈ 10³, L ≈ 3·10³.
 
