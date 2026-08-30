@@ -6,18 +6,13 @@ import Foundation
 // evaluated. It backs `SyntaxHighlightingMode.synchronous`, which offscreen renderers use
 // because they never give asynchronous tokenization a chance to reach the drawing pass.
 //
-// Tokens are a pure function of the code and its language, so results are memoized in a
-// bounded cache. Offscreen renderers typically evaluate the same body several times, and
-// paginated output re-renders the same code blocks once per page.
+// Results are memoized in the CodeTokenCache shared with the asynchronous tokenizer.
+// Offscreen renderers typically evaluate the same body several times, and paginated
+// output re-renders the same code blocks once per page.
 
 @MainActor
 enum SynchronousCodeTokenizer {
-  /// The maximum number of tokenized code blocks kept in the cache.
-  private static let cacheLimit = 128
-
   private static let tokenizer = PrismTokenizer()
-  private static var cache: [CacheKey: [CodeToken]] = [:]
-  private static var insertionOrder: [CacheKey] = []
 
   /// Tokenizes `code`, reusing a previous result when one is available.
   ///
@@ -27,26 +22,12 @@ enum SynchronousCodeTokenizer {
       return [CodeToken(content: code, type: .plain)]
     }
 
-    let key = CacheKey(code: code, language: language)
-
-    if let tokens = cache[key] {
+    if let tokens = CodeTokenCache.shared.tokens(code: code, language: language) {
       return tokens
     }
 
     let tokens = tokenizer.tokenize(code: code, language: language)
-
-    if insertionOrder.count == cacheLimit {
-      cache.removeValue(forKey: insertionOrder.removeFirst())
-    }
-
-    cache[key] = tokens
-    insertionOrder.append(key)
-
+    CodeTokenCache.shared.store(tokens, code: code, language: language)
     return tokens
-  }
-
-  private struct CacheKey: Hashable {
-    let code: String
-    let language: String
   }
 }

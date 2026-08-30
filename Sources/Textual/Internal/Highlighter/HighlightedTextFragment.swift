@@ -83,11 +83,20 @@ extension HighlightedTextFragment {
 
     func tokenize(content: AttributedSubstring, languageHint: String?) async {
       let code = String(content.characters[...])
-      tokens = [CodeToken(content: code, type: .plain)]
 
-      if let tokenizer = CodeTokenizer.shared, let languageHint {
-        tokens = await tokenizer.tokenize(code: code, language: languageHint)
+      guard let tokenizer = CodeTokenizer.shared, let languageHint else {
+        tokens = [CodeToken(content: code, type: .plain)]
+        return
       }
+
+      // A cached result can be adopted without flashing the plain placeholder first
+      if let cached = CodeTokenCache.shared.tokens(code: code, language: languageHint) {
+        tokens = cached
+        return
+      }
+
+      tokens = [CodeToken(content: code, type: .plain)]
+      tokens = await tokenizer.tokenize(code: code, language: languageHint)
     }
 
     func highlight(

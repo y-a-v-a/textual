@@ -22,6 +22,12 @@ actor CodeTokenizer {
   }
 
   func tokenize(code: String, language: String) -> [CodeToken] {
-    tokenizer.tokenize(code: code, language: language)
+    if let tokens = CodeTokenCache.shared.tokens(code: code, language: language) {
+      return tokens
+    }
+
+    let tokens = tokenizer.tokenize(code: code, language: language)
+    CodeTokenCache.shared.store(tokens, code: code, language: language)
+    return tokens
   }
 }
