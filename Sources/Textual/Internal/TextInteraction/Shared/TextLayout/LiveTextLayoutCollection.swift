@@ -53,10 +53,21 @@
     }
 
     func index(of layout: Text.Layout) -> Int? {
-      layouts.firstIndex { textLayout in
-        (textLayout as? LiveTextLayout)?.base == layout
-      }
+      indexByLayout[LayoutHashKey(layout)]
     }
+
+    // Every fragment's selection background asks for its layout index whenever the selection
+    // changes, so a linear search here is quadratic per selection change over the document
+    private lazy var indexByLayout: [LayoutHashKey: Int] = {
+      var indexByLayout = [LayoutHashKey: Int](minimumCapacity: layoutIdentity.count)
+      for (index, layout) in layoutIdentity.enumerated() {
+        // Keep the first index for equal layouts, matching a first-match linear search
+        if indexByLayout[LayoutHashKey(layout)] == nil {
+          indexByLayout[LayoutHashKey(layout)] = index
+        }
+      }
+      return indexByLayout
+    }()
 
     private var anchoredTextFragments: [Text.LayoutKey.AnchoredLayout] {
       // We are only interested in text fragments
@@ -70,6 +81,33 @@
           geometry: geometry
         )
       }
+    }
+  }
+
+  /// Wraps `Text.Layout` — which is `Equatable` but not `Hashable` — for use as a dictionary
+  /// key. The hash combines values derived from the lines, so equal layouts hash equally and
+  /// collisions fall back to the equality check.
+  private struct LayoutHashKey: Hashable {
+    let layout: Text.Layout
+
+    init(_ layout: Text.Layout) {
+      self.layout = layout
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+      lhs.layout == rhs.layout
+    }
+
+    func hash(into hasher: inout Hasher) {
+      hasher.combine(layout.count)
+      guard let firstLine = layout.first else {
+        return
+      }
+      let rect = firstLine.typographicBounds.rect
+      hasher.combine(rect.origin.x)
+      hasher.combine(rect.origin.y)
+      hasher.combine(rect.size.width)
+      hasher.combine(rect.size.height)
     }
   }
 
