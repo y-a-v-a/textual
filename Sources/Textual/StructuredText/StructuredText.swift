@@ -103,6 +103,7 @@ import SwiftUI
 /// ``MarkupParser`` implementation.
 public struct StructuredText: View {
   @State private var attributedString = AttributedString()
+  @State private var parseThrottle = Throttle()
 
   private let markup: String
   private let parser: any MarkupParser
@@ -130,7 +131,11 @@ public struct StructuredText: View {
   }
 
   private func markupDidChange(_ markup: String) {
-    self.attributedString = (try? parser.attributedString(for: markup)) ?? .init()
+    // Parsing is proportional to the whole document, so bursts of changes — streamed content
+    // appending many times per second — are coalesced instead of parsed one by one
+    parseThrottle.schedule {
+      self.attributedString = (try? parser.attributedString(for: markup)) ?? .init()
+    }
   }
 }
 
