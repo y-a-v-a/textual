@@ -96,6 +96,7 @@ import SwiftUI
 /// ```
 public struct InlineText: View {
   @State private var attributedString = AttributedString()
+  @State private var parseThrottle = Throttle()
 
   private let markup: String
   private let parser: any MarkupParser
@@ -119,7 +120,10 @@ public struct InlineText: View {
     }
     .coordinateSpace(.textContainer)
     .onChange(of: markup, initial: true) { _, value in
-      self.attributedString = (try? parser.attributedString(for: value)) ?? .init()
+      // Coalesce bursts of changes; see the note in StructuredText.markupDidChange
+      parseThrottle.schedule {
+        self.attributedString = (try? parser.attributedString(for: value)) ?? .init()
+      }
     }
   }
 }

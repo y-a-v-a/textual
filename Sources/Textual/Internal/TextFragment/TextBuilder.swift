@@ -64,13 +64,38 @@ extension Text {
     attachmentSizes: [AttachmentKey: CGSize],
     in environment: TextEnvironmentValues
   ) {
-    let textValues = attributedString.runs.map { run in
+    // Only attachment placeholders and links need a `Text` of their own; every other run can be
+    // carried by the attributed string itself. Emitting one `Text` per run and concatenating
+    // them builds a deep expression tree for richly formatted prose, so consecutive plain runs
+    // are coalesced into a single `Text`.
+    var textValues: [Text] = []
+    var plainRange: Range<AttributedString.Index>?
+
+    func flushPlainRange() {
+      guard let range = plainRange else { return }
+      textValues.append(Text(AttributedString(attributedString[range])))
+      plainRange = nil
+    }
+
+    for run in attributedString.runs {
+      let link = run.link
+      let attachment = run.textual.attachment
+      let effect = run.textual.textRunEffect
+
+      guard link != nil || attachment != nil || effect != nil else {
+        // Extend the pending plain span instead of emitting a `Text` for this run.
+        plainRange = (plainRange?.lowerBound ?? run.range.lowerBound)..<run.range.upperBound
+        continue
+      }
+
+      flushPlainRange()
+
       var text: Text
 
       var runEnvironment = environment
       runEnvironment.font = run.font ?? environment.font
 
-      let key = run.textual.attachment.map {
+      let key = attachment.map {
         AttachmentKey(attachment: $0, font: runEnvironment.font)
       }
 
@@ -89,12 +114,19 @@ extension Text {
       }
 
       // Add link attribute for TextLinkInteraction
-      if let link = run.link {
+      if let link {
         text = text.customAttribute(LinkAttribute(link))
       }
 
-      return text
+      // Add effect attribute for TextRunEffectRenderer
+      if let effect {
+        text = text.customAttribute(TextRunEffectAttribute(effect))
+      }
+
+      textValues.append(text)
     }
+
+    flushPlainRange()
 
     self = textValues.reduce(Text(verbatim: "")) { partialResult, text in
       partialResult + text

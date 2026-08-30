@@ -35,6 +35,23 @@ struct ListDemo: View {
         )
       }
       .textual.textSelection(.enabled)
+
+      Section("Task Lists") {
+        StructuredText(
+          markdown: """
+            A list item that starts with `[ ]` or `[x]` renders as a checkbox.
+
+            - [x] Open the project
+            - [x] Skim recent changes
+            - [ ] Fix the *actual* issue
+              - [x] Re-read the code
+              - [ ] Question past decisions :ablobthinking:
+            - [ ] Commit early and often
+            """,
+          syntaxExtensions: [.emoji(.mastoEmoji)]
+        )
+      }
+      .textual.textSelection(.enabled)
     }
     .formStyle(.grouped)
   }

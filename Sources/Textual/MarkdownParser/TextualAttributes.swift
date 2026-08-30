@@ -18,11 +18,36 @@ extension AttributeScopes {
       public static let name = "Textual.EmojiURL"
     }
 
+    /// Stores a custom drawing effect in attributed content.
+    ///
+    /// Set this attribute on a range to decorate it with a ``TextRunEffect``.
+    public enum TextRunEffectAttribute: AttributedStringKey {
+      public typealias Value = AnyTextRunEffect
+      public static let name = "Textual.TextRunEffect"
+    }
+
+    /// Marks a leading bracket whose task list marker was escaped in the Markdown source.
+    ///
+    /// Foundation's Markdown parser consumes backslash escapes, so `\[ ]` and `[ ]` parse to
+    /// the same literal text. The built-in Markdown parser sets this attribute on the bracket
+    /// when the source spelled the marker with an escape, so that task list detection leaves
+    /// the text literal.
+    public enum EscapedTaskListMarkerAttribute: AttributedStringKey {
+      public typealias Value = Bool
+      public static let name = "Textual.EscapedTaskListMarker"
+    }
+
     /// A property for accessing an attachment attribute.
     public let attachment: AttachmentAttribute
 
     /// A property for accessing an emoji URL attribute.
     public let emojiURL: EmojiURLAttribute
+
+    /// A property for accessing a text run effect attribute.
+    public let textRunEffect: TextRunEffectAttribute
+
+    /// A property for accessing an escaped task list marker attribute.
+    public let escapedTaskListMarker: EscapedTaskListMarkerAttribute
 
     public let foundation: AttributeScopes.FoundationAttributes
   }

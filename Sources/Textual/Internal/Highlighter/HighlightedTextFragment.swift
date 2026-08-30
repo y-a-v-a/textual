@@ -2,15 +2,23 @@ import SwiftUI
 
 // MARK: - Overview
 //
-// HighlightedTextFragment displays syntax-highlighted code using a two-phase approach.
-// Tokenization runs asynchronously and is keyed by content, while highlighting runs
-// synchronously on token or environment changes (theme, color scheme, dynamic type).
+// HighlightedTextFragment displays syntax-highlighted code. Tokenization is the expensive
+// step and its timing depends on the current SyntaxHighlightingMode:
+//
+// - .asynchronous (default) tokenizes in a task keyed by content, and highlights on token
+//   or environment changes (theme, color scheme, dynamic type).
+// - .synchronous tokenizes and highlights while the body is evaluated, so that offscreen
+//   renderers draw highlighted code on their very first pass.
+//
+// Highlighting itself — turning tokens into an AttributedString — is a pure function in
+// both modes.
 //
 // The presentationIntent is preserved after highlighting so pasteboard formatters can
 // reconstruct the block structure when copying code.
 
 struct HighlightedTextFragment: View {
   @Environment(\.textEnvironment) private var textEnvironment
+  @Environment(\.syntaxHighlightingMode) private var syntaxHighlightingMode
 
   @State private var model = Model()
 
@@ -29,9 +37,12 @@ struct HighlightedTextFragment: View {
   }
 
   var body: some View {
-    TextFragment(model.highlightedCode ?? AttributedString(content))
+    TextFragment(highlightedCode)
       .foregroundStyle(theme.foregroundColor)
-      .task(id: content) {
+      // Keyed by the mode as well as the content, so that a fragment switched over to
+      // asynchronous highlighting still tokenizes
+      .task(id: Tuple(content, syntaxHighlightingMode)) {
+        guard syntaxHighlightingMode == .asynchronous else { return }
         await model.tokenize(
           content: content,
           languageHint: languageHint
@@ -46,6 +57,23 @@ struct HighlightedTextFragment: View {
         )
       }
   }
+
+  private var highlightedCode: AttributedString {
+    switch syntaxHighlightingMode {
+    case .asynchronous:
+      model.highlightedCode ?? AttributedString(content)
+    case .synchronous:
+      Model.highlightedCode(
+        tokens: SynchronousCodeTokenizer.tokenize(
+          code: String(content.characters[...]),
+          language: languageHint
+        ),
+        presentationIntent: content.presentationIntent,
+        using: theme,
+        environment: textEnvironment
+      )
+    }
+  }
 }
 
 extension HighlightedTextFragment {
@@ -55,11 +83,20 @@ extension HighlightedTextFragment {
 
     func tokenize(content: AttributedSubstring, languageHint: String?) async {
       let code = String(content.characters[...])
-      tokens = [CodeToken(content: code, type: .plain)]
 
-      if let tokenizer = CodeTokenizer.shared, let languageHint {
-        tokens = await tokenizer.tokenize(code: code, language: languageHint)
+      guard let tokenizer = CodeTokenizer.shared, let languageHint else {
+        tokens = [CodeToken(content: code, type: .plain)]
+        return
       }
+
+      // A cached result can be adopted without flashing the plain placeholder first
+      if let cached = CodeTokenCache.shared.tokens(code: code, language: languageHint) {
+        tokens = cached
+        return
+      }
+
+      tokens = [CodeToken(content: code, type: .plain)]
+      tokens = await tokenizer.tokenize(code: code, language: languageHint)
     }
 
     func highlight(
@@ -68,6 +105,20 @@ extension HighlightedTextFragment {
       using theme: StructuredText.HighlighterTheme,
       environment: TextEnvironmentValues
     ) {
+      self.highlightedCode = Self.highlightedCode(
+        tokens: tokens,
+        presentationIntent: presentationIntent,
+        using: theme,
+        environment: environment
+      )
+    }
+
+    static func highlightedCode(
+      tokens: [CodeToken],
+      presentationIntent: PresentationIntent?,
+      using theme: StructuredText.HighlighterTheme,
+      environment: TextEnvironmentValues
+    ) -> AttributedString {
       var attributes = AttributeContainer()
       // Re-apply the presentation intent for pasteboard formatters
       attributes.presentationIntent = presentationIntent
@@ -87,7 +138,7 @@ extension HighlightedTextFragment {
         highlightedCode.append(content)
       }
 
-      self.highlightedCode = highlightedCode
+      return highlightedCode
     }
   }
 }

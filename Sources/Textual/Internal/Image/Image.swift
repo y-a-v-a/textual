@@ -22,6 +22,20 @@ struct Image: Hashable, Sendable {
 
   var cgImage: CGImage { frames[0].cgImage }
   var isAnimated: Bool { frames.count > 1 }
+
+  // Equality compares CGImage instances, so equal images share their first frame's instance
+  // and hashing that identity keeps the Hashable contract. The synthesized implementation
+  // hashed every frame of an animated image — and attachments are hashed once per fragment
+  // per body evaluation.
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(frames.count)
+    hasher.combine(loopCount)
+    hasher.combine(size.width)
+    hasher.combine(size.height)
+    if let firstFrame = frames.first {
+      hasher.combine(ObjectIdentifier(firstFrame.cgImage))
+    }
+  }
 }
 
 extension Image {

@@ -227,6 +227,17 @@ extension TextualNamespace where Base: View {
     base.environment(\.unorderedListMarker, unorderedListMarker)
   }
 
+  /// Sets the task list marker used by ``StructuredText``.
+  ///
+  /// A list item whose text starts with `[ ]`, `[x]`, or `[X]` is rendered with this marker
+  /// instead of the unordered list marker.
+  @inlinable
+  public func taskListMarker(
+    _ taskListMarker: some StructuredText.TaskListMarker
+  ) -> some View {
+    base.environment(\.taskListMarker, taskListMarker)
+  }
+
   /// Sets the thematic break style used by ``StructuredText``.
   @inlinable
   public func thematicBreakStyle(
@@ -239,6 +250,22 @@ extension TextualNamespace where Base: View {
   @inlinable
   public func highlighterTheme(_ highlighterTheme: StructuredText.HighlighterTheme) -> some View {
     base.environment(\.highlighterTheme, highlighterTheme)
+  }
+
+  /// Sets the syntax highlighting mode used by code blocks in ``StructuredText``.
+  ///
+  /// Use ``SyntaxHighlightingMode/synchronous`` when rendering offscreen, so that code
+  /// blocks are already highlighted on the first drawing pass.
+  ///
+  /// ```swift
+  /// let renderer = ImageRenderer(
+  ///   content: StructuredText(markdown: markdown)
+  ///     .textual.syntaxHighlightingMode(.synchronous)
+  /// )
+  /// ```
+  @inlinable
+  public func syntaxHighlightingMode(_ mode: SyntaxHighlightingMode) -> some View {
+    base.environment(\.syntaxHighlightingMode, mode)
   }
 
   /// Sets the code block style used by ``StructuredText``.
@@ -281,6 +308,7 @@ extension TextualNamespace where Base: View {
       .environment(\.listItemStyle, style.listItemStyle)
       .environment(\.unorderedListMarker, style.unorderedListMarker)
       .environment(\.orderedListMarker, style.orderedListMarker)
+      .environment(\.taskListMarker, style.taskListMarker)
       .environment(\.tableStyle, style.tableStyle)
       .environment(\.tableCellStyle, style.tableCellStyle)
       .environment(\.thematicBreakStyle, style.thematicBreakStyle)

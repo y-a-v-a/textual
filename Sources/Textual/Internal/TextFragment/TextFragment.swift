@@ -29,6 +29,11 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   @Environment(\.textEnvironment) private var textEnvironment
   @State private var textBuilder: TextBuilder?
 
+  // All three features are needed on every body pass to decide which fragment-level overlays
+  // and renderers to install. They are resolved in a single scan over the runs, memoized so
+  // the scan happens per content change rather than per body evaluation.
+  @State private var inlineFeatures = Memo<Content, InlineFeatures>()
+
   private let content: Content
 
   init(_ content: Content) {
@@ -36,24 +41,52 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   }
 
   var body: some View {
-    text
-      .customAttribute(TextFragmentAttribute())
-      .onGeometryChange(for: CGSize?.self, of: \.textContainerSize) { size in
-        guard let size, let textBuilder else { return }
-        textBuilder.sizeChanged(size, environment: textEnvironment)
+    let (attachments, hasLinks, hasTextRunEffects) = inlineFeatures(content) {
+      content.inlineFeatures()
+    }
+
+    Group {
+      // Observing the container size only matters for attachments, whose placeholder sizes are
+      // recomputed as the container resizes. Installing the observer on every fragment adds a
+      // geometry node per block, which is the dominant cost in a large document.
+      if attachments.isEmpty {
+        textView(hasTextRunEffects: hasTextRunEffects)
+      } else {
+        textView(hasTextRunEffects: hasTextRunEffects)
+          .onGeometryChange(for: CGSize?.self, of: \.textContainerSize) { size in
+            guard let size, let textBuilder else { return }
+            textBuilder.sizeChanged(size, environment: textEnvironment)
+          }
       }
-      .onChange(of: content, initial: true) { _, newValue in
-        self.textBuilder = TextBuilder(newValue, environment: textEnvironment)
-      }
-      .modifier(TextSelectionBackground())
-      .modifier(AttachmentOverlay(attachments: content.attachments()))
-      .modifier(TextLinkInteraction())
+    }
+    .onChange(of: content, initial: true) { _, newValue in
+      self.textBuilder = TextBuilder(newValue, environment: textEnvironment)
+    }
+    .modifier(TextSelectionBackground())
+    .modifier(AttachmentOverlay(attachments: attachments))
+    .modifier(TextLinkInteraction(hasLinks: hasLinks))
+  }
+
+  // The custom renderer is installed only where it earns its place. Fragments without effects
+  // keep SwiftUI's own text rendering path, so nothing about how the rest of a document draws
+  // depends on a feature it does not use.
+  @ViewBuilder private func textView(hasTextRunEffects: Bool) -> some View {
+    if hasTextRunEffects {
+      text.textRenderer(TextRunEffectRenderer())
+    } else {
+      text
+    }
   }
 
   private var text: Text {
-    textBuilder?.text ?? Text(verbatim: "")
+    // The marker identifies this fragment to any `Text.Layout` consumer, so it is always applied.
+    (textBuilder?.text ?? Text(verbatim: "")).customAttribute(TextFragmentAttribute())
   }
 }
+
+private typealias InlineFeatures = (
+  attachments: Set<AnyAttachment>, hasLinks: Bool, hasTextRunEffects: Bool
+)
 
 struct TextFragmentAttribute: TextAttribute {
 }

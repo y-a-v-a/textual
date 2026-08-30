@@ -12,23 +12,36 @@ import SwiftUI
 struct TextLinkInteraction: ViewModifier {
   @Environment(\.openURL) private var openURL
 
+  private let hasLinks: Bool
+
+  init(hasLinks: Bool) {
+    self.hasLinks = hasLinks
+  }
+
   func body(content: Content) -> some View {
     #if TEXTUAL_ENABLE_LINKS
-      content
-        .overlayPreferenceValue(Text.LayoutKey.self) { value in
-          if let anchoredLayout = value.first {
-            GeometryReader { geometry in
-              Color.clear
-                .contentShape(.rect)
-                .gesture(
-                  tap(
-                    origin: geometry[anchoredLayout.origin],
-                    layout: anchoredLayout.layout
+      // Reading `Text.LayoutKey` forces SwiftUI to resolve the fragment’s text layout and publish
+      // it as an anchored preference. Fragments without links have nothing to hit-test, so skip
+      // the reader entirely rather than paying that cost per fragment.
+      if hasLinks {
+        content
+          .overlayPreferenceValue(Text.LayoutKey.self) { value in
+            if let anchoredLayout = value.first {
+              GeometryReader { geometry in
+                Color.clear
+                  .contentShape(.rect)
+                  .gesture(
+                    tap(
+                      origin: geometry[anchoredLayout.origin],
+                      layout: anchoredLayout.layout
+                    )
                   )
-                )
+              }
             }
           }
-        }
+      } else {
+        content
+      }
     #else
       content
     #endif
