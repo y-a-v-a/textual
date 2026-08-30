@@ -23,14 +23,31 @@ public struct AttributedStringMarkdownParser: MarkupParser {
   }
 
   public func attributedString(for input: String) throws -> AttributedString {
-    try processor.expand(
-      AttributedString(
-        markdown: input,
-        including: \.textual,
-        options: options,
-        baseURL: baseURL
-      )
+    // Escaped task list markers (`\[ ]`) parse to the same text as real ones, so they can
+    // only be told apart through source positions while the source is still at hand
+    var options = self.options
+    let detectsEscapedMarkers = EscapedTaskListMarkers.mayContain(input)
+
+    if detectsEscapedMarkers {
+      options.appliesSourcePositionAttributes = true
+    }
+
+    var output = try AttributedString(
+      markdown: input,
+      including: \.textual,
+      options: options,
+      baseURL: baseURL
     )
+
+    if detectsEscapedMarkers {
+      EscapedTaskListMarkers.mark(in: &output, source: input)
+
+      if !self.options.appliesSourcePositionAttributes {
+        output.markdownSourcePosition = nil
+      }
+    }
+
+    return try processor.expand(output)
   }
 }
 

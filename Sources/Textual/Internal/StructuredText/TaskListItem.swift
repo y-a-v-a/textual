@@ -30,7 +30,9 @@ extension AttributedSubstring {
     guard let run = runs.first,
       run.inlinePresentationIntent?.isEmpty ?? true,
       run.link == nil,
-      run.textual.attachment == nil
+      run.textual.attachment == nil,
+      // An escaped marker (`\[ ]`) parses to the same text as a real one; the parser tags it
+      run.textual.escapedTaskListMarker != true
     else {
       return nil
     }

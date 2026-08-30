@@ -26,6 +26,17 @@ extension AttributeScopes {
       public static let name = "Textual.TextRunEffect"
     }
 
+    /// Marks a leading bracket whose task list marker was escaped in the Markdown source.
+    ///
+    /// Foundation's Markdown parser consumes backslash escapes, so `\[ ]` and `[ ]` parse to
+    /// the same literal text. The built-in Markdown parser sets this attribute on the bracket
+    /// when the source spelled the marker with an escape, so that task list detection leaves
+    /// the text literal.
+    public enum EscapedTaskListMarkerAttribute: AttributedStringKey {
+      public typealias Value = Bool
+      public static let name = "Textual.EscapedTaskListMarker"
+    }
+
     /// A property for accessing an attachment attribute.
     public let attachment: AttachmentAttribute
 
@@ -34,6 +45,9 @@ extension AttributeScopes {
 
     /// A property for accessing a text run effect attribute.
     public let textRunEffect: TextRunEffectAttribute
+
+    /// A property for accessing an escaped task list marker attribute.
+    public let escapedTaskListMarker: EscapedTaskListMarkerAttribute
 
     public let foundation: AttributeScopes.FoundationAttributes
   }

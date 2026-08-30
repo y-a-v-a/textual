@@ -3,6 +3,7 @@ import Testing
 
 @testable import Textual
 
+@MainActor
 struct TaskListItemTests {
   @Test func incompleteMarker() throws {
     let items = try taskListItems(in: "- [ ] Take out the trash")
@@ -85,6 +86,12 @@ struct TaskListItemTests {
       "- [] Take out the trash",
       "- ] Take out the trash",
       "- [ Take out the trash",
+      // The marker must not be escaped in the source
+      "- \\[ ] Take out the trash",
+      "- \\[x] Take out the trash",
+      "- \\[X] Take out the trash",
+      "- [ \\] Take out the trash",
+      "- [x\\] Take out the trash",
     ]
   )
   func nonTaskItems(markdown: String) throws {
@@ -94,14 +101,62 @@ struct TaskListItemTests {
     #expect(items.first ?? nil == nil)
   }
 
+  @Test func escapedMarkerStaysLiteral() throws {
+    let document = try parse("- \\[ ] Take out the trash")
+
+    #expect(String(document.characters[...]) == "[ ] Take out the trash")
+  }
+
+  @Test func escapedMarkerNextToRealMarker() throws {
+    let items = try taskListItems(
+      in: """
+        - [x] Take out the trash
+        - \\[ ] This is not a task
+        """
+    )
+
+    #expect(items.count == 2)
+    #expect(items[0]?.isCompleted == true)
+    #expect(items[1] == nil)
+  }
+
+  @Test func escapedBracketsInCodeBlocksStayUntouched() throws {
+    let document = try parse(
+      """
+      ```
+      - \\[ ] not a task
+      ```
+      """
+    )
+
+    #expect(String(document.characters[...]).contains("- \\[ ] not a task"))
+    #expect(document.runs.allSatisfy { $0.textual.escapedTaskListMarker == nil })
+  }
+
+  @Test func escapeHandlingLeavesNoSourcePositions() throws {
+    let document = try parse("- \\[ ] Take out the trash")
+
+    #expect(document.runs.allSatisfy { $0.markdownSourcePosition == nil })
+  }
+
+  @Test func escapeHandlingKeepsRequestedSourcePositions() throws {
+    var options = AttributedString.MarkdownParsingOptions()
+    options.appliesSourcePositionAttributes = true
+
+    let document = try AttributedStringMarkdownParser(baseURL: nil, options: options)
+      .attributedString(for: "- \\[ ] Take out the trash")
+
+    #expect(document.runs.contains { $0.markdownSourcePosition != nil })
+  }
+
   // MARK: - Helpers
 
+  private func parse(_ markdown: String) throws -> AttributedString {
+    try AttributedStringMarkdownParser(baseURL: nil).attributedString(for: markdown)
+  }
+
   private func taskListItems(in markdown: String) throws -> [StructuredText.TaskListItem?] {
-    let document = try AttributedString(
-      markdown: markdown,
-      including: \.textual,
-      options: .init(interpretedSyntax: .full)
-    )
+    let document = try parse(markdown)
 
     var items: [StructuredText.TaskListItem?] = []
 
