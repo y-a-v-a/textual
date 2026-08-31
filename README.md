@@ -5,12 +5,35 @@
 
 Render and customize rich attributed text in SwiftUI.
 
+- [About this fork](#about-this-fork)
 - [Overview](#overview)
 - [Getting Started](#getting-started)
 - [Demos](#demos)
 - [Documentation](#documentation)
 - [Installation](#installation)
 - [License](#license)
+
+## About this fork
+
+This repository is a fork of [gonzalezreal/textual](https://github.com/gonzalezreal/textual) that has
+diverged significantly from upstream. The divergence lies in three areas:
+
+- **New features** — GitHub-flavored Markdown task lists rendered as checkboxes with customizable
+  markers, custom text run effects drawn behind or in front of the glyphs through the `TextRunEffect`
+  protocol, and a synchronous syntax highlighting mode for offscreen rendering such as `ImageRenderer`
+  or PDF export.
+- **Streaming performance** — a series of optimizations for re-rendering markup that streams in
+  incrementally: memoized block decomposition and inline feature scans, throttled re-parsing of
+  streamed markup changes, a token cache shared by both code tokenizers, adopting new layout origins
+  instead of rebuilding the layout collection, dictionary-based layout index lookups, and hashing
+  images by their first frame's identity. Renderer benchmarks with before/after results live in
+  [`TEXTUAL_PERF.md`](./TEXTUAL_PERF.md).
+- **Fixes** — list item spacing reacts to environment changes, and escaped task list markers stay
+  literal instead of turning into checkboxes.
+
+The rest of this README documents the fork as it stands. The badges above and the documentation and
+installation links below still point at the upstream project and do not reflect the changes listed
+here.
 
 ## Overview
 
