@@ -96,7 +96,12 @@ extension HighlightedTextFragment {
       }
 
       tokens = [CodeToken(content: code, type: .plain)]
-      tokens = await tokenizer.tokenize(code: code, language: languageHint)
+      let tokenized = await tokenizer.tokenize(code: code, language: languageHint)
+      // The task is cancelled when the content changes, and a newer task may have already
+      // published tokens for the new content (the cache path above resolves without suspending),
+      // so a cancelled result must not land
+      guard !Task.isCancelled else { return }
+      tokens = tokenized
     }
 
     func highlight(

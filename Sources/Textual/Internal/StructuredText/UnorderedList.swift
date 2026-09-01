@@ -5,8 +5,10 @@ extension StructuredText {
     @Environment(\.listItemSpacing) private var listItemSpacing
     @Environment(\.textEnvironment) private var textEnvironment
 
-    @State private var blockRuns =
-      Memo<Tuple<AttributedSubstring, PresentationIntent.IntentType?>, AttributedString.BlockRuns>()
+    // Cached as self-contained slices, not indices into `content`: the memo hits on content
+    // equality even when the backing string changed (a streamed re-parse)
+    @State private var blockSlices =
+      Memo<Tuple<AttributedSubstring, PresentationIntent.IntentType?>, [AttributedString.BlockSlice]>()
 
     private let intent: PresentationIntent.IntentType?
     private let content: AttributedSubstring
@@ -17,17 +19,17 @@ extension StructuredText {
     }
 
     var body: some View {
-      let runs = blockRuns(Tuple(content, intent)) {
-        content.blockRuns(parent: intent)
+      let slices = blockSlices(Tuple(content, intent)) {
+        content.blockSlices(parent: intent)
       }
 
       BlockVStack {
-        ForEach(runs.indices, id: \.self) { index in
-          let run = runs[index]
+        ForEach(slices.indices, id: \.self) { index in
+          let slice = slices[index]
 
           UnorderedListItem(
-            intent: run.intent,
-            content: content[run.range]
+            intent: slice.intent,
+            content: slice.content
           )
         }
       }

@@ -92,6 +92,25 @@ extension AttributedStringProtocol {
   func blockRuns(parent: PresentationIntent.IntentType? = nil) -> AttributedString.BlockRuns {
     AttributedString.BlockRuns(attributedString: self, parent: parent)
   }
+
+  /// Decomposes the string into its block-level slices.
+  ///
+  /// Unlike `blockRuns(parent:)`, the result carries the substrings themselves instead of index
+  /// ranges, so it stays renderable when memoized: a memo keyed on string equality can hit for
+  /// an equal-content string with different backing storage, whose indices the cached ranges
+  /// would not be valid in.
+  func blockSlices(parent: PresentationIntent.IntentType? = nil) -> [AttributedString.BlockSlice] {
+    blockRuns(parent: parent).map { run in
+      AttributedString.BlockSlice(intent: run.intent, content: self[run.range])
+    }
+  }
+}
+
+extension AttributedString {
+  struct BlockSlice {
+    let intent: PresentationIntent.IntentType?
+    let content: AttributedSubstring
+  }
 }
 
 extension AttributedString {

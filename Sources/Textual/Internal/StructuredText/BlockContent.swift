@@ -3,9 +3,11 @@ import SwiftUI
 extension StructuredText {
   struct BlockContent<Content: AttributedStringProtocol>: View {
     // Deriving the block decomposition walks every run; memoizing it keeps that cost tied to
-    // content changes instead of body evaluations
-    @State private var blockRuns =
-      Memo<Tuple<Content, PresentationIntent.IntentType?>, AttributedString.BlockRuns>()
+    // content changes instead of body evaluations. The memo hits on content equality even when
+    // the backing string changed (a streamed re-parse), so it must cache self-contained slices,
+    // never indices into `content`
+    @State private var blockSlices =
+      Memo<Tuple<Content, PresentationIntent.IntentType?>, [AttributedString.BlockSlice]>()
 
     private let parent: PresentationIntent.IntentType?
     private let content: Content
@@ -16,14 +18,14 @@ extension StructuredText {
     }
 
     var body: some View {
-      let runs = blockRuns(Tuple(content, parent)) {
-        content.blockRuns(parent: parent)
+      let slices = blockSlices(Tuple(content, parent)) {
+        content.blockSlices(parent: parent)
       }
 
       BlockVStack {
-        ForEach(runs.indices, id: \.self) { index in
-          let run = runs[index]
-          Block(intent: run.intent, content: content[run.range])
+        ForEach(slices.indices, id: \.self) { index in
+          let slice = slices[index]
+          Block(intent: slice.intent, content: slice.content)
         }
       }
     }
