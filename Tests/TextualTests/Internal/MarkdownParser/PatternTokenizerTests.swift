@@ -159,6 +159,29 @@ struct PatternTokenizerTests {
     )
   }
 
+  @Test func singleCharacterInlineMath() throws {
+    let tokenizer = PatternTokenizer(patterns: [.mathBlock, .mathInline])
+    let tokens = try tokenizer.tokenize("Let $x$ be")
+    #expect(
+      tokens == [
+        .init(type: .text, content: "Let "),
+        .init(type: .mathInline, content: "$x$", capturedContent: "x"),
+        .init(type: .text, content: " be"),
+      ]
+    )
+  }
+
+  @Test func proseDollarAmountsAreNotMath() throws {
+    let tokenizer = PatternTokenizer(patterns: [.mathBlock, .mathInline])
+    for text in [
+      "It costs $5 and $10 today.",
+      "Between $ 5 and 10 $ now",
+      "From $x$5 onward",
+    ] {
+      #expect(tokenizer.tokenize(text) == [.init(type: .text, content: text)], "\(text)")
+    }
+  }
+
   @Test func blockMath() throws {
     // given
     let tokenizer = PatternTokenizer(patterns: [.mathBlock, .mathInline])
