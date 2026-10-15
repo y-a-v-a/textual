@@ -79,8 +79,14 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   }
 
   private var text: Text {
+    var text = textBuilder?.text ?? Text(verbatim: "")
+
+    if let accessibilityLabel = textBuilder?.accessibilityLabel {
+      text = text.accessibilityLabel(Text(verbatim: accessibilityLabel))
+    }
+
     // The marker identifies this fragment to any `Text.Layout` consumer, so it is always applied.
-    (textBuilder?.text ?? Text(verbatim: "")).customAttribute(TextFragmentAttribute())
+    return text.customAttribute(TextFragmentAttribute())
   }
 }
 
