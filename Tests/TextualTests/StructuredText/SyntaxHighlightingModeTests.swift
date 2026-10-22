@@ -31,8 +31,16 @@
     @Test func asynchronousHighlightingIsMissingFromTheFirstDrawnFrame() throws {
       // This is the limitation `.synchronous` exists to solve: an offscreen renderer draws
       // before asynchronous tokenization can deliver its tokens, so code prints uncolored.
+      // The code differs from the other tests', which would otherwise leave its tokens in the
+      // shared token cache for the asynchronous path to adopt before the first frame.
+      let markdown = """
+        ```swift
+        let farewell = "Goodbye, world!"
+        func leave() -> String { farewell }
+        ```
+        """
       let image = try #require(
-        OffscreenHost.firstFrame(of: StructuredText(markdown: Self.markdown))
+        OffscreenHost.firstFrame(of: StructuredText(markdown: markdown))
       )
 
       #expect(image.distinctHueCount() == 0)
