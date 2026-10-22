@@ -41,10 +41,10 @@ struct ThrottleTests {
   }
 
   // The window ends on the main actor, which other tests can keep busy for longer than a fixed
-  // wait, so wait for the outcome instead
+  // wait, so wait for the outcome instead. The limit counts turns on the main actor rather than
+  // time, because no turn passes while another test holds it.
   private func waitUntil(_ condition: () -> Bool) async throws {
-    let deadline = ContinuousClock.now + .seconds(5)
-    while !condition(), ContinuousClock.now < deadline {
+    for _ in 0..<1000 where !condition() {
       try await Task.sleep(for: .milliseconds(5))
     }
   }
