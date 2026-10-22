@@ -95,7 +95,8 @@ import SwiftUI
 ///   .textual.inlineStyle(style)
 /// ```
 public struct InlineText: View {
-  @State private var attributedString = AttributedString()
+  @State private var attributedString: AttributedString?
+  @State private var parsedMarkup = Memo<String, AttributedString>()
   @State private var parseThrottle = Throttle()
 
   private let markup: String
@@ -112,18 +113,25 @@ public struct InlineText: View {
   }
 
   public var body: some View {
-    WithAttachments(attributedString) {
+    // Parsed in `body` until the first change is; see the note in StructuredText.body
+    WithAttachments(attributedString ?? parse(markup)) {
       WithInlineStyle($0) {
         TextFragment($0)
           .modifier(TextSelectionInteraction())
       }
     }
     .coordinateSpace(.textContainer)
-    .onChange(of: markup, initial: true) { _, value in
+    .onChange(of: markup) { _, value in
       // Coalesce bursts of changes; see the note in StructuredText.markupDidChange
       parseThrottle.schedule {
-        self.attributedString = (try? parser.attributedString(for: value)) ?? .init()
+        self.attributedString = parse(value)
       }
+    }
+  }
+
+  private func parse(_ markup: String) -> AttributedString {
+    parsedMarkup(markup) {
+      (try? parser.attributedString(for: markup)) ?? .init()
     }
   }
 }

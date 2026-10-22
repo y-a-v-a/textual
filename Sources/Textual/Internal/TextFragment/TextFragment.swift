@@ -22,12 +22,23 @@ import SwiftUI
 // container. TextFragment uses onGeometryChange to observe the container size and rebuild
 // Text when attachment sizes need to change.
 //
+// The TextBuilder is derived in body rather than seeded from onChange(initial:), so the text is
+// there on the fragment's first layout pass. Seeded from that event, the fragment first lays out
+// empty, which a List measures as the row's height, and a fragment that a lazy container
+// materializes can miss the event altogether.
+//
 // TextFragment is used by InlineText and StructuredText (via BlockContent) to render
 // attributed content with inline attachments, links, and selection.
 
 struct TextFragment<Content: AttributedStringProtocol>: View {
   @Environment(\.textEnvironment) private var textEnvironment
-  @State private var textBuilder: TextBuilder?
+
+  // Rebuilt when the content or the text environment (fonts, dynamic type, color scheme) changes
+  @State private var textBuilder = Memo<Tuple<Content, TextEnvironmentValues>, TextBuilder>()
+
+  // The container size last reported to a builder. A new builder starts from it, because the
+  // container may not change size again to report it, such as when only the color scheme changes.
+  @State private var containerSize = Box<CGSize?>(nil)
 
   // All three features are needed on every body pass to decide which fragment-level overlays
   // and renderers to install. They are resolved in a single scan over the runs, memoized so
@@ -44,23 +55,28 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
     let (attachments, hasLinks, hasTextRunEffects) = inlineFeatures(content) {
       content.inlineFeatures()
     }
+    let builder = textBuilder(Tuple(content, textEnvironment)) {
+      TextBuilder(
+        content,
+        containerSize: containerSize.wrappedValue,
+        environment: textEnvironment
+      )
+    }
 
     Group {
       // Observing the container size only matters for attachments, whose placeholder sizes are
       // recomputed as the container resizes. Installing the observer on every fragment adds a
       // geometry node per block, which is the dominant cost in a large document.
       if attachments.isEmpty {
-        textView(hasTextRunEffects: hasTextRunEffects)
+        textView(builder, hasTextRunEffects: hasTextRunEffects)
       } else {
-        textView(hasTextRunEffects: hasTextRunEffects)
+        textView(builder, hasTextRunEffects: hasTextRunEffects)
           .onGeometryChange(for: CGSize?.self, of: \.textContainerSize) { size in
-            guard let size, let textBuilder else { return }
-            textBuilder.sizeChanged(size, environment: textEnvironment)
+            guard let size else { return }
+            containerSize.wrappedValue = size
+            builder.sizeChanged(size, environment: textEnvironment)
           }
       }
-    }
-    .onChange(of: content, initial: true) { _, newValue in
-      self.textBuilder = TextBuilder(newValue, environment: textEnvironment)
     }
     .modifier(TextSelectionBackground())
     .modifier(AttachmentOverlay(attachments: attachments))
@@ -70,18 +86,20 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   // The custom renderer is installed only where it earns its place. Fragments without effects
   // keep SwiftUI's own text rendering path, so nothing about how the rest of a document draws
   // depends on a feature it does not use.
-  @ViewBuilder private func textView(hasTextRunEffects: Bool) -> some View {
+  @ViewBuilder private func textView(
+    _ builder: TextBuilder, hasTextRunEffects: Bool
+  ) -> some View {
     if hasTextRunEffects {
-      text.textRenderer(TextRunEffectRenderer())
+      text(builder).textRenderer(TextRunEffectRenderer())
     } else {
-      text
+      text(builder)
     }
   }
 
-  private var text: Text {
-    var text = textBuilder?.text ?? Text(verbatim: "")
+  private func text(_ builder: TextBuilder) -> Text {
+    var text = builder.text
 
-    if let accessibilityLabel = textBuilder?.accessibilityLabel {
+    if let accessibilityLabel = builder.accessibilityLabel {
       text = text.accessibilityLabel(Text(verbatim: accessibilityLabel))
     }
 
