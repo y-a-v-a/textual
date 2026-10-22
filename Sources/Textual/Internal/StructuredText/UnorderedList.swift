@@ -60,19 +60,21 @@ extension StructuredText {
       // A task list item renders a checkbox in place of the bullet, and drops the `[ ]` marker
       // from the text it displays
       let taskListItem = content.taskListItem
-      let configuration = ListItemStyleConfiguration(
-        marker: .init(marker(for: taskListItem)),
-        block: .init(
-          BlockContent(
-            parent: intent,
-            content: taskListItem?.content ?? content
-          )
-        ),
-        indentationLevel: indentationLevel
-      )
-      let resolvedStyle = listItemStyle.resolve(configuration: configuration)
 
-      AnyView(resolvedStyle)
+      Group(
+        subviews: BlockContent(parent: intent, content: taskListItem?.content ?? content)
+      ) { block in
+        let configuration = ListItemStyleConfiguration(
+          marker: .init(marker(for: taskListItem)),
+          block: .init(block),
+          indentationLevel: indentationLevel
+        )
+        let resolvedStyle = listItemStyle.resolve(configuration: configuration)
+
+        AnyView(resolvedStyle)
+          // The style can place the block inside a container, which hides its spacing
+          .containerValue(\.nestedBlockSpacing, block.blockSpacing)
+      }
     }
 
     private func marker(for taskListItem: TaskListItem?) -> some View {

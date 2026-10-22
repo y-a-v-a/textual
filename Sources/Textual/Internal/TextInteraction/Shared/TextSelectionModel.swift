@@ -50,25 +50,34 @@
         return
       }
 
-      guard layoutCollection.needsPositionReconciliation(with: self.layoutCollection) else {
-        // Same text layouts at new positions: keep the current collection — and everything it
-        // has lazily materialized — and only take over the new origins
-        self.layoutCollection.adoptOrigins(from: layoutCollection)
+      // Same text layouts at new positions: keep the current collection — and everything it
+      // has lazily materialized — and only take over the new origins
+      if self.layoutCollection.adoptOrigins(from: layoutCollection) {
         return
       }
 
       let oldLayoutCollection = self.layoutCollection
       self.layoutCollection = layoutCollection
 
-      guard let selectedRange else {
+      guard
+        let selectedRange,
+        layoutCollection.needsPositionReconciliation(with: oldLayoutCollection)
+      else {
         return
       }
 
-      // Try to reconcile the selected text range
-      self.selectedRange = layoutCollection.reconcileRange(
+      // Try to reconcile the selected text range. Only write when it actually
+      // changes: as the overlay's GeometryReader/preferences converge, this runs
+      // several times per frame with the same result, and a redundant write to the
+      // observed `selectedRange` is what SwiftUI flags as "onChange(of:
+      // AnyTextLayoutCollection) action tried to update multiple times per frame".
+      let reconciled = layoutCollection.reconcileRange(
         selectedRange,
         from: oldLayoutCollection
       )
+      if reconciled != self.selectedRange {
+        self.selectedRange = reconciled
+      }
     }
 
     func setCoordinator(_ coordinator: TextSelectionCoordinator?) {
@@ -115,7 +124,13 @@
     }
 
     func offset(from: TextPosition, to: TextPosition) -> Int {
-      layoutCollection.characterIndex(at: to) - layoutCollection.characterIndex(at: from)
+      guard
+        let fromIndex = layoutCollection.characterIndex(at: from),
+        let toIndex = layoutCollection.characterIndex(at: to)
+      else {
+        return 0
+      }
+      return toIndex - fromIndex
     }
 
     func firstRect(for range: TextRange) -> CGRect {

@@ -19,12 +19,18 @@ import SwiftUI
 extension TextFragment {
   @MainActor @Observable final class TextBuilder {
     var text: Text
+    /// The text with each attachment's accessibility label in its place, when any attachment has one
+    @ObservationIgnored let accessibilityLabel: String?
 
     @ObservationIgnored private let content: Content
     @ObservationIgnored private let cache: NSCache<KeyBox<[AttachmentKey: CGSize]>, Box<Text>>
 
-    init(_ content: Content, environment: TextEnvironmentValues) {
-      let attachmentSizes = content.attachmentSizes(for: .unspecified, in: environment)
+    /// Creates a builder whose attachments are sized for `containerSize`, when it is known.
+    init(_ content: Content, containerSize: CGSize? = nil, environment: TextEnvironmentValues) {
+      let attachmentSizes = content.attachmentSizes(
+        for: containerSize.map { ProposedViewSize($0) } ?? .unspecified,
+        in: environment
+      )
 
       self.text = Text(
         attributedString: content,
@@ -32,6 +38,7 @@ extension TextFragment {
         in: environment
       )
       self.content = content
+      self.accessibilityLabel = content.accessibilityLabel()
       self.cache = NSCache()
       self.cache.countLimit = 10
 
@@ -128,8 +135,25 @@ extension Text {
 
     flushPlainRange()
 
-    self = textValues.reduce(Text(verbatim: "")) { partialResult, text in
-      partialResult + text
+    self = Text(concatenating: textValues[...])
+  }
+
+  // SwiftUI resolves a concatenated Text recursively, a few stack frames per `+`.
+  // Folding runs left to right nests them one level per run, so a block with a
+  // few hundred runs (e.g., links or attachments that can't be coalesced) exhausts
+  // the 1 MB main-thread stack on iOS. Joining them as a balanced tree keeps the
+  // depth logarithmic.
+  private init(concatenating texts: ArraySlice<Text>) {
+    switch texts.count {
+    case 0:
+      self.init(verbatim: "")
+    case 1:
+      self = texts[texts.startIndex]
+    default:
+      let middle = texts.startIndex + texts.count / 2
+      self =
+        Text(concatenating: texts[..<middle])
+        + Text(concatenating: texts[middle...])
     }
   }
 
@@ -139,6 +163,22 @@ extension Text {
 }
 
 extension AttributedStringProtocol {
+  fileprivate func accessibilityLabel() -> String? {
+    // Most fragments have no labeled attachment, so check before building the label
+    guard runs.contains(where: { $0.textual.attachment?.accessibilityLabel != nil }) else {
+      return nil
+    }
+
+    return runs.map { run in
+      guard let attachment = run.textual.attachment else {
+        return String(self[run.range].characters)
+      }
+
+      return attachment.accessibilityLabel ?? ""
+    }
+    .joined()
+  }
+
   fileprivate func attachmentSizes(
     for proposal: ProposedViewSize, in environment: TextEnvironmentValues
   ) -> [AttachmentKey: CGSize] {

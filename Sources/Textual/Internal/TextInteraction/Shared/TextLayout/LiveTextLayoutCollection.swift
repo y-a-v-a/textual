@@ -34,22 +34,22 @@
       layoutIdentity != (other as? LiveTextLayoutCollection)?.layoutIdentity
     }
 
-    func adoptOrigins(from other: any TextLayoutCollection) {
-      // Expects `other` to carry the same layouts; only their origins are taken over
-      guard let other = other as? LiveTextLayoutCollection else {
-        return
+    func adoptOrigins(from other: any TextLayoutCollection) -> Bool {
+      guard
+        let other = other as? LiveTextLayoutCollection,
+        layoutIdentity == other.layoutIdentity
+      else {
+        return false
       }
 
       base = other.base
       geometry = other.geometry
 
-      guard let materializedLayouts else {
-        return
-      }
-
-      for (layout, anchoredLayout) in zip(materializedLayouts, anchoredTextFragments) {
+      for (layout, anchoredLayout) in zip(materializedLayouts ?? [], anchoredTextFragments) {
         (layout as? LiveTextLayout)?.origin = geometry[anchoredLayout.origin]
       }
+
+      return true
     }
 
     func index(of layout: Text.Layout) -> Int? {

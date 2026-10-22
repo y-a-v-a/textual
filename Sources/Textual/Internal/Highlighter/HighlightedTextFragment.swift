@@ -48,10 +48,13 @@ struct HighlightedTextFragment: View {
           languageHint: languageHint
         )
       }
-      .onChange(of: Tuple(model.tokens, textEnvironment)) { _, newValue in
+      // Keyed by the content as well, so that attributes the caller changes without changing the
+      // code itself, such as search highlighting, reach the screen with the current tokens
+      .onChange(of: Tuple(model.tokens, textEnvironment, content)) { _, newValue in
         model.highlight(
           tokens: newValue.values.0,
-          presentationIntent: content.presentationIntent,
+          original: newValue.values.2,
+          presentationIntent: newValue.values.2.presentationIntent,
           using: theme,
           environment: newValue.values.1
         )
@@ -68,6 +71,7 @@ struct HighlightedTextFragment: View {
           code: String(content.characters[...]),
           language: languageHint
         ),
+        original: content,
         presentationIntent: content.presentationIntent,
         using: theme,
         environment: textEnvironment
@@ -106,12 +110,14 @@ extension HighlightedTextFragment {
 
     func highlight(
       tokens: [CodeToken],
+      original: AttributedSubstring,
       presentationIntent: PresentationIntent?,
       using theme: StructuredText.HighlighterTheme,
       environment: TextEnvironmentValues
     ) {
       self.highlightedCode = Self.highlightedCode(
         tokens: tokens,
+        original: original,
         presentationIntent: presentationIntent,
         using: theme,
         environment: environment
@@ -120,6 +126,7 @@ extension HighlightedTextFragment {
 
     static func highlightedCode(
       tokens: [CodeToken],
+      original: AttributedSubstring,
       presentationIntent: PresentationIntent?,
       using theme: StructuredText.HighlighterTheme,
       environment: TextEnvironmentValues
@@ -131,12 +138,31 @@ extension HighlightedTextFragment {
         .apply(in: &attributes, environment: environment)
       var highlightedCode = AttributedString()
 
+      // Each token is sliced from the original content rather than rebuilt from its plain string,
+      // so the attributes the caller's parser applied to the code survive. Theme attributes are
+      // merged on top and win for the keys they set. Slicing needs the token lengths to add up to
+      // the content's; when they don't (tokens left over from previous content, or a token split
+      // inside a grapheme cluster), every token falls back to its own string so that no text is
+      // lost or repeated.
+      let slicesOriginal =
+        tokens.reduce(0) { $0 + $1.content.count } == original.characters.count
+      var tokenStart = original.startIndex
+
       for token in tokens {
-        var content = AttributedString(token.content)
         var tokenAttributes = attributes
 
         if let tokenProperties = theme.tokenProperties[token.type] {
           tokenProperties.apply(in: &tokenAttributes, environment: environment)
+        }
+
+        var content: AttributedString
+
+        if slicesOriginal {
+          let tokenEnd = original.characters.index(tokenStart, offsetBy: token.content.count)
+          content = AttributedString(original[tokenStart..<tokenEnd])
+          tokenStart = tokenEnd
+        } else {
+          content = AttributedString(token.content)
         }
 
         content.mergeAttributes(tokenAttributes)

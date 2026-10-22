@@ -16,7 +16,7 @@ Render and customize rich attributed text in SwiftUI.
 ## About this fork
 
 This repository is a fork of [gonzalezreal/textual](https://github.com/gonzalezreal/textual) that has
-diverged significantly from upstream. The divergence lies in three areas:
+diverged significantly from upstream. The divergence lies in four areas:
 
 - **New features** — GitHub-flavored Markdown task lists rendered as checkboxes with customizable
   markers, custom text run effects drawn behind or in front of the glyphs through the `TextRunEffect`
@@ -30,6 +30,19 @@ diverged significantly from upstream. The divergence lies in three areas:
   [`TEXTUAL_PERF.md`](./TEXTUAL_PERF.md).
 - **Fixes** — list item spacing reacts to environment changes, and escaped task list markers stay
   literal instead of turning into checkboxes.
+- **Open upstream pull requests** — fixes still under review upstream, merged here and adapted to
+  the fork where they overlap with it: content that is there on the first layout pass, so `List`
+  rows keep their height and `ImageRenderer` draws text
+  ([#84](https://github.com/gonzalezreal/textual/pull/84),
+  [#90](https://github.com/gonzalezreal/textual/pull/90)); crash and selection fixes
+  ([#67](https://github.com/gonzalezreal/textual/pull/67),
+  [#70](https://github.com/gonzalezreal/textual/pull/70),
+  [#71](https://github.com/gonzalezreal/textual/pull/71),
+  [#80](https://github.com/gonzalezreal/textual/pull/80),
+  [#92](https://github.com/gonzalezreal/textual/pull/92)); stale content after markup changes
+  ([#86](https://github.com/gonzalezreal/textual/pull/86)); caller attributes kept on code blocks
+  ([#83](https://github.com/gonzalezreal/textual/pull/83)); and attachment accessibility labels
+  ([#91](https://github.com/gonzalezreal/textual/pull/91)).
 
 The rest of this README documents the fork as it stands. The badges above and the documentation and
 installation links below still point at the upstream project and do not reflect the changes listed

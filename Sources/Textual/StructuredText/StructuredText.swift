@@ -102,7 +102,8 @@ import SwiftUI
 /// When you need to parse something other than Markdown, use ``init(_:parser:)`` with a custom
 /// ``MarkupParser`` implementation.
 public struct StructuredText: View {
-  @State private var attributedString = AttributedString()
+  @State private var attributedString: AttributedString?
+  @State private var parsedMarkup = Memo<String, AttributedString>()
   @State private var parseThrottle = Throttle()
 
   private let markup: String
@@ -117,13 +118,17 @@ public struct StructuredText: View {
   }
 
   public var body: some View {
-    WithAttachments(attributedString) {
+    // Until the first change is parsed, the content is parsed in `body`, so that it is there on
+    // the first layout pass. Seeded only from `onChange(initial:)`, the view first lays out
+    // empty, which a `List` measures as the row's height, and a view that a lazy container
+    // materializes can miss the event altogether.
+    WithAttachments(attributedString ?? parse(markup)) {
       BlockContent(content: $0)
         .modifier(TextSelectionInteraction())
         .modifier(TextSelectionCoordination())
     }
     .coordinateSpace(.textContainer)
-    .onChange(of: markup, initial: true) {
+    .onChange(of: markup) {
       markupDidChange(markup)
     }
     // Disable line limit to avoid per-fragment truncation
@@ -134,7 +139,14 @@ public struct StructuredText: View {
     // Parsing is proportional to the whole document, so bursts of changes — streamed content
     // appending many times per second — are coalesced instead of parsed one by one
     parseThrottle.schedule {
-      self.attributedString = (try? parser.attributedString(for: markup)) ?? .init()
+      self.attributedString = parse(markup)
+    }
+  }
+
+  // Memoized, so the first change, which `body` already parsed, isn't parsed again
+  private func parse(_ markup: String) -> AttributedString {
+    parsedMarkup(markup) {
+      (try? parser.attributedString(for: markup)) ?? .init()
     }
   }
 }

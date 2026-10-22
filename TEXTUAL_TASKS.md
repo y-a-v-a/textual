@@ -36,6 +36,10 @@ it does: in an offscreen window host, `.synchronous` produces coloured code on
 the first drawn frame while the default produces none. Once #84 lands,
 `ImageRenderer` should pick this up for free.
 
+Update (2026-10-22): the fork now derives content in `body`, adapted from #84
+and #90, and `ImageRenderer` draws `StructuredText` and `InlineText` (covered by
+`FirstLayoutPassTests`).
+
 ### Known gap in Task 3 — closed (2026-08-29)
 
 An escaped marker (`- \[ ] text`) used to render a checkbox: Foundation's parser

@@ -22,6 +22,11 @@ final class Throttle {
     self.interval = interval
   }
 
+  /// Whether calls are deferred to the end of a cooldown window.
+  var isCoolingDown: Bool {
+    cooldown != nil
+  }
+
   /// Runs `operation` now, or — inside the cooldown window — once the window ends.
   ///
   /// Only the most recent operation scheduled during a window survives it.

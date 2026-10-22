@@ -6,13 +6,17 @@
 
     func isEqual(to other: any TextLayoutCollection) -> Bool
     func needsPositionReconciliation(with other: any TextLayoutCollection) -> Bool
-    func adoptOrigins(from other: any TextLayoutCollection)
+    /// Takes over the origins of `other` when it carries the same text layouts at new positions,
+    /// and returns whether it did.
+    func adoptOrigins(from other: any TextLayoutCollection) -> Bool
     func index(of layout: Text.Layout) -> Int?
   }
 
   extension TextLayoutCollection {
     // Only live collections track origins separately from their layouts
-    func adoptOrigins(from other: any TextLayoutCollection) {}
+    func adoptOrigins(from other: any TextLayoutCollection) -> Bool {
+      false
+    }
   }
 
   struct AnyTextLayoutCollection: TextLayoutCollection, Equatable {
@@ -34,7 +38,7 @@
       base.needsPositionReconciliation(with: other)
     }
 
-    func adoptOrigins(from other: any TextLayoutCollection) {
+    func adoptOrigins(from other: any TextLayoutCollection) -> Bool {
       base.adoptOrigins(from: other)
     }
 
