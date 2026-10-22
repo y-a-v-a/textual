@@ -45,6 +45,30 @@
       #expect(heights.first == heights.settled)
     }
 
+    // An offscreen renderer, such as an export, draws a single pass and never delivers the
+    // appearance callbacks, so content that only arrives through one never gets drawn
+    @Test func imageRendererDrawsStructuredText() throws {
+      let image = try #require(
+        ImageRenderer(
+          content: StructuredText(markdown: "A paragraph with **strong** text.")
+            .frame(width: Self.width)
+        ).cgImage
+      )
+
+      #expect(image.countPixels { _ in true } > 0)
+    }
+
+    @Test func imageRendererDrawsInlineText() throws {
+      let image = try #require(
+        ImageRenderer(
+          content: InlineText(markdown: "Inline text with `code`.")
+            .frame(width: Self.width)
+        ).cgImage
+      )
+
+      #expect(image.countPixels { _ in true } > 0)
+    }
+
     /// The height of `view` on the first sizing pass, and once its state has settled.
     private static func heights(
       of view: some View
