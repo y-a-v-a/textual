@@ -24,7 +24,7 @@ struct ThrottleTests {
 
     #expect(runs == ["first"])
 
-    try await Task.sleep(for: .milliseconds(100))
+    try await waitUntil { runs.count == 2 }
 
     #expect(runs == ["first", "third"])
   }
@@ -34,9 +34,18 @@ struct ThrottleTests {
     var runs: [String] = []
 
     throttle.schedule { runs.append("first") }
-    try await Task.sleep(for: .milliseconds(100))
+    try await waitUntil { !throttle.isCoolingDown }
     throttle.schedule { runs.append("second") }
 
     #expect(runs == ["first", "second"])
+  }
+
+  // The window ends on the main actor, which other tests can keep busy for longer than a fixed
+  // wait, so wait for the outcome instead
+  private func waitUntil(_ condition: () -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(5)
+    while !condition(), ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(5))
+    }
   }
 }
