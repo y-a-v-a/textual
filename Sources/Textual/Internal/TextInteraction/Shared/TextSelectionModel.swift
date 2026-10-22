@@ -50,17 +50,19 @@
         return
       }
 
-      guard layoutCollection.needsPositionReconciliation(with: self.layoutCollection) else {
-        // Same text layouts at new positions: keep the current collection — and everything it
-        // has lazily materialized — and only take over the new origins
-        self.layoutCollection.adoptOrigins(from: layoutCollection)
+      // Same text layouts at new positions: keep the current collection — and everything it
+      // has lazily materialized — and only take over the new origins
+      if self.layoutCollection.adoptOrigins(from: layoutCollection) {
         return
       }
 
       let oldLayoutCollection = self.layoutCollection
       self.layoutCollection = layoutCollection
 
-      guard let selectedRange else {
+      guard
+        let selectedRange,
+        layoutCollection.needsPositionReconciliation(with: oldLayoutCollection)
+      else {
         return
       }
 

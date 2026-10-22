@@ -88,12 +88,13 @@
       identity != (other as? SpyTextLayoutCollection)?.identity
     }
 
-    func adoptOrigins(from other: any TextLayoutCollection) {
-      guard let other = other as? SpyTextLayoutCollection else {
-        return
+    func adoptOrigins(from other: any TextLayoutCollection) -> Bool {
+      guard let other = other as? SpyTextLayoutCollection, identity == other.identity else {
+        return false
       }
       origins = other.origins
       adoptedOrigins = other.origins
+      return true
     }
 
     func index(of layout: Text.Layout) -> Int? {
