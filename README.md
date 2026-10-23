@@ -16,7 +16,22 @@ Render and customize rich attributed text in SwiftUI.
 ## About this fork
 
 This repository is a fork of [gonzalezreal/textual](https://github.com/gonzalezreal/textual) that has
-diverged significantly from upstream. The divergence lies in four areas:
+diverged significantly from upstream. It started from upstream 0.5.0 and has since grown by close to
+5,000 lines across about 90 files, so it is no longer a thin patch set on top of the original.
+
+Treat it as a moving fork:
+
+- **No releases.** The fork publishes no tags of its own and `main` moves as work lands. Pin a
+  commit rather than following the branch if you need a stable build (see
+  [Installation](#installation)).
+- **Upstream is merged selectively.** Upstream releases and open pull requests are reviewed as they
+  appear. Fixes are merged and adapted where they overlap with the fork's own changes; larger
+  features are left out until upstream settles on them. The last review covered upstream 0.5.0 and
+  the pull requests open in October 2026.
+- **The API can drift.** Fork-only APIs, such as task lists and `TextRunEffect`, may change between commits, and
+  code written against this fork will not always build against upstream, or the other way around.
+
+The divergence lies in four areas:
 
 - **New features** — GitHub-flavored Markdown task lists rendered as checkboxes with customizable
   markers, custom text run effects drawn behind or in front of the glyphs through the `TextRunEffect`
@@ -27,9 +42,11 @@ diverged significantly from upstream. The divergence lies in four areas:
   streamed markup changes, a token cache shared by both code tokenizers, adopting new layout origins
   instead of rebuilding the layout collection, dictionary-based layout index lookups, and hashing
   images by their first frame's identity. Renderer benchmarks with before/after results live in
-  [`TEXTUAL_PERF.md`](./TEXTUAL_PERF.md).
-- **Fixes** — list item spacing reacts to environment changes, and escaped task list markers stay
-  literal instead of turning into checkboxes.
+  [`TEXTUAL_PERF.md`](./TEXTUAL_PERF.md). Its streaming figures overstate the gain: the benchmark
+  never gives throttled updates a chance to run, so it largely times an empty document.
+- **Fixes** — list item spacing reacts to environment changes, escaped task list markers stay
+  literal instead of turning into checkboxes, and text selection lets go of the previous layout
+  when the content becomes empty.
 - **Open upstream pull requests** — fixes still under review upstream, merged here and adapted to
   the fork where they overlap with it: content that is there on the first layout pass, so `List`
   rows keep their height and `ImageRenderer` draws text
@@ -44,9 +61,8 @@ diverged significantly from upstream. The divergence lies in four areas:
   ([#83](https://github.com/gonzalezreal/textual/pull/83)); and attachment accessibility labels
   ([#91](https://github.com/gonzalezreal/textual/pull/91)).
 
-The rest of this README documents the fork as it stands. The badges above and the documentation and
-installation links below still point at the upstream project and do not reflect the changes listed
-here.
+The rest of this README documents the fork as it stands. The badges above and the documentation link
+below still point at the upstream project and do not cover the changes listed here.
 
 ## Overview
 
@@ -65,7 +81,8 @@ applies styling through environment values, and uses SwiftUI's layout system to 
 - **Native text selection** with proper copy-paste support
 - **Markdown support** via Foundation's `AttributedString` built-in parser
 - **Custom markup parser support** through the `MarkupParser` protocol
-- **Inline attachments** that flow with the text, such as images and custom emoji
+- **Inline attachments** that flow with the text, such as images and custom emoji, with optional
+  VoiceOver labels for custom attachments
 - **Math expressions** rendered as inline or block attachments
 - **Animated image support** (GIF, APNG, WebP)
 - **Syntax highlighting** with customizable themes, including a synchronous mode for offscreen rendering
@@ -260,9 +277,13 @@ StructuredText(markdown: markdown)
 
 ### Offscreen Rendering
 
-Code blocks are tokenized asynchronously so that scrolling stays smooth. Offscreen renderers —
-`ImageRenderer`, PDF export, printing — draw before that work can finish, so code comes out
-uncolored. Switch to synchronous highlighting for those cases:
+`InlineText` and `StructuredText` have their content from the very first layout pass, so offscreen
+renderers — `ImageRenderer`, PDF export, printing — draw the text, and rows in a self-sizing
+container such as `List` measure at their final height.
+
+Code blocks are tokenized asynchronously so that scrolling stays smooth. Offscreen renderers draw
+a single frame before that work can finish, so code comes out uncolored. Switch to synchronous
+highlighting for those cases:
 
 ```swift
 StructuredText(markdown: markdown)
@@ -417,20 +438,28 @@ The latest documentation for Textual is available [here](https://swiftpackageind
 
 ## Installation
 
-You can add Textual to an Xcode project by adding it to your project as a package.
+You can add this fork to an Xcode project by adding it to your project as a package and choosing a
+branch or commit as the dependency rule, since the fork has no version tags:
 
-> https://github.com/gonzalezreal/textual
+> https://github.com/y-a-v-a/textual
 
-If you want to use Textual in a [SwiftPM](https://swift.org/package-manager/) project, it's as
-simple as adding it to your `Package.swift`:
+If you want to use the fork in a [SwiftPM](https://swift.org/package-manager/) project, add it to
+your `Package.swift`. Because `main` moves, pin a commit for builds that must be reproducible:
 
 ``` swift
 dependencies: [
-  .package(url: "https://github.com/gonzalezreal/textual", from: "0.1.0")
+  // Follow the fork as it moves
+  .package(url: "https://github.com/y-a-v-a/textual", branch: "main"),
+  // Or pin a commit
+  // .package(url: "https://github.com/y-a-v-a/textual", revision: "<commit>"),
 ]
 ```
 
-And then adding the product to any target that needs access to the library:
+To use the upstream project instead, depend on
+[gonzalezreal/textual](https://github.com/gonzalezreal/textual) with a version requirement such as
+`from: "0.5.0"`. It does not include the changes listed in [About this fork](#about-this-fork).
+
+Then add the product to any target that needs access to the library:
 
 ```swift
 .product(name: "Textual", package: "textual"),
