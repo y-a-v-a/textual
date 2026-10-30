@@ -263,7 +263,10 @@
       }
 
       let attributedText = model.attributedText(in: selectedRange)
-      let transferableText = TransferableText(attributedString: attributedText)
+      let transferableText = TransferableText(
+        attributedString: attributedText,
+        startsInsideBlock: model.startsInsideBlock(selectedRange)
+      )
       let itemProvider = NSItemProvider(object: transferableText)
 
       let sharingPicker = NSSharingServicePicker(items: [itemProvider])
@@ -284,7 +287,10 @@
       let pasteboard = NSPasteboard.general
       pasteboard.clearContents()
 
-      let formatter = Formatter(attributedText)
+      let formatter = Formatter(
+        attributedText,
+        startsInsideBlock: model.startsInsideBlock(selectedRange)
+      )
       pasteboard.setString(formatter.plainText(), forType: .string)
       pasteboard.setString(formatter.html(), forType: .html)
     }

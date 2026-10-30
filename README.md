@@ -45,8 +45,9 @@ The divergence lies in four areas:
   [`TEXTUAL_PERF.md`](./TEXTUAL_PERF.md). Its streaming figures overstate the gain: the benchmark
   never gives throttled updates a chance to run, so it largely times an empty document.
 - **Fixes** — list item spacing reacts to environment changes, escaped task list markers stay
-  literal instead of turning into checkboxes, and text selection lets go of the previous layout
-  when the content becomes empty.
+  literal instead of turning into checkboxes, text selection lets go of the previous layout
+  when the content becomes empty, and copying part of a list item, quote, or table cell copies
+  only the selected text, without the list marker or number in front of it.
 - **Open upstream pull requests** — fixes still under review upstream, merged here and adapted to
   the fork where they overlap with it: content that is there on the first layout pass, so `List`
   rows keep their height and `ImageRenderer` draws text

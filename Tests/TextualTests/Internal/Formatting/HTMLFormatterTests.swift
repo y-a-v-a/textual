@@ -215,15 +215,23 @@ struct HTMLFormatterTests {
       NSAttributedString(
         markdown: """
           > This is a quote.
+          >
+          > It has two paragraphs.
           """
       )
     )
+    let expected = """
+      <blockquote>
+      <p>This is a quote.</p>
+      <p>It has two paragraphs.</p>
+      </blockquote>
+      """
 
     // when
     let result = formatter.html()
 
     // then
-    #expect(result == "<blockquote>\n<p>This is a quote.</p>\n</blockquote>")
+    #expect(result == expected)
   }
 
   @Test func blockQuoteWithParagraphs() throws {
@@ -672,5 +680,116 @@ struct HTMLFormatterTests {
 
     // then
     #expect(result == "<p></p>")
+  }
+
+  // MARK: - Partial selections
+
+  @Test func textInsideOrderedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "cond it",
+      in: """
+        1. First item
+        2. Second item
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.html()
+
+    // then
+    #expect(result == "<p>cond it</p>")
+  }
+
+  @Test func firstWordOfListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "Second",
+      in: """
+        - First item
+        - Second item
+        """
+    )
+
+    // when
+    let result = formatter.html()
+
+    // then
+    #expect(result == "<p>Second</p>")
+  }
+
+  @Test func selectionStartingInsideUnorderedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "cond itemThird item",
+      in: """
+        * First item
+        * Second item
+        * Third item
+        """,
+      startsInsideBlock: true
+    )
+    let expected = """
+      <p>cond item</p>
+      <ul>
+      <li>Third item</li>
+      </ul>
+      """
+
+    // when
+    let result = formatter.html()
+
+    // then
+    #expect(result == expected)
+  }
+
+  @Test func selectionStartingInsideOrderedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "cond itemThird item",
+      in: """
+        1. First item
+        2. Second item
+        3. Third item
+        """,
+      startsInsideBlock: true
+    )
+    let expected = """
+      <p>cond item</p>
+      <ol start="3">
+      <li>Third item</li>
+      </ol>
+      """
+
+    // when
+    let result = formatter.html()
+
+    // then
+    #expect(result == expected)
+  }
+
+  @Test func selectionStartingAtListItemStart() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "Second itemThird item",
+      in: """
+        1. First item
+        2. Second item
+        3. Third item
+        """
+    )
+    let expected = """
+      <ol start="2">
+      <li>Second item</li>
+      <li>Third item</li>
+      </ol>
+      """
+
+    // when
+    let result = formatter.html()
+
+    // then
+    #expect(result == expected)
   }
 }

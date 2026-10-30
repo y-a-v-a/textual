@@ -117,6 +117,63 @@
     }
 
     @Test
+    func rangeStartingInsideBlock() throws {
+      // given
+      let model = try TextSelectionModel(fixtureName: "two-paragraphs-bidi")
+      let range = TextRange(
+        start: TextPosition(
+          indexPath: .init(runSlice: 1, run: 2, line: 0, layout: 0),
+          affinity: .downstream
+        ),
+        end: model.endPosition
+      )
+
+      // when
+      let startsInsideBlock = model.startsInsideBlock(range)
+
+      // then
+      #expect(startsInsideBlock)
+    }
+
+    @Test
+    func rangeStartingAtBlockStart() throws {
+      // given
+      let model = try TextSelectionModel(fixtureName: "two-paragraphs-bidi")
+      let range = TextRange(
+        start: TextPosition(
+          indexPath: .init(runSlice: 0, run: 0, line: 0, layout: 1),
+          affinity: .downstream
+        ),
+        end: model.endPosition
+      )
+
+      // when
+      let startsInsideBlock = model.startsInsideBlock(range)
+
+      // then
+      #expect(!startsInsideBlock)
+    }
+
+    @Test
+    func rangeStartingAtPreviousBlockEnd() throws {
+      // given
+      let model = try TextSelectionModel(fixtureName: "two-paragraphs-bidi")
+      let range = TextRange(
+        start: TextPosition(
+          indexPath: .init(runSlice: 0, run: 2, line: 1, layout: 0),
+          affinity: .upstream
+        ),
+        end: model.endPosition
+      )
+
+      // when
+      let startsInsideBlock = model.startsInsideBlock(range)
+
+      // then
+      #expect(!startsInsideBlock)
+    }
+
+    @Test
     func positionFromOffsetZero() throws {
       // given
       let model = try TextSelectionModel(fixtureName: "two-paragraphs-bidi")

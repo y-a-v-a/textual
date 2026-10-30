@@ -115,6 +115,11 @@
       layoutCollection.attributedText(in: range)
     }
 
+    /// Whether the text in `range` starts partway through a block, past text it leaves out.
+    func startsInsideBlock(_ range: TextRange) -> Bool {
+      layoutCollection.startsInsideLayout(range)
+    }
+
     func text(in range: TextRange) -> String {
       attributedText(in: range).string
     }

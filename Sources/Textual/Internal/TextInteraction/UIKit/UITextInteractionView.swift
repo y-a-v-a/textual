@@ -80,7 +80,10 @@
       }
 
       let attributedText = model.attributedText(in: selectedRange)
-      let formatter = Formatter(attributedText)
+      let formatter = Formatter(
+        attributedText,
+        startsInsideBlock: model.startsInsideBlock(selectedRange)
+      )
 
       UIPasteboard.general.setItems(
         [
@@ -130,7 +133,10 @@
       }
 
       let attributedText = model.attributedText(in: selectedRange)
-      let itemSource = TextActivityItemSource(attributedString: attributedText)
+      let itemSource = TextActivityItemSource(
+        attributedString: attributedText,
+        startsInsideBlock: model.startsInsideBlock(selectedRange)
+      )
 
       let activityViewController = UIActivityViewController(
         activityItems: [itemSource],

@@ -5,8 +5,11 @@
   final class TextActivityItemSource: NSObject, UIActivityItemSource {
     let transferableText: TransferableText
 
-    init(attributedString: NSAttributedString) {
-      self.transferableText = TransferableText(attributedString: attributedString)
+    init(attributedString: NSAttributedString, startsInsideBlock: Bool) {
+      self.transferableText = TransferableText(
+        attributedString: attributedString,
+        startsInsideBlock: startsInsideBlock
+      )
       super.init()
     }
 

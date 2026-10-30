@@ -19,19 +19,26 @@ import Foundation
 final class Formatter {
   lazy var blockNodes: [BlockNode] = makeBlockNodes()
 
+  /// Whether the text starts partway through its first block, as a selection that begins in the
+  /// middle of a line does. The list items around that block started before the text, so their
+  /// markers and the indentation leading the first line are left out.
+  let startsInsideBlock: Bool
+
   private let attributedString: AttributedString
 
-  convenience init(_ nsAttributedString: NSAttributedString) {
+  convenience init(_ nsAttributedString: NSAttributedString, startsInsideBlock: Bool = false) {
     self.init(
       (try? AttributedString(
         nsAttributedString,
         including: \.textual
-      )) ?? .init()
+      )) ?? .init(),
+      startsInsideBlock: startsInsideBlock
     )
   }
 
-  init(_ attributedString: AttributedString) {
+  init(_ attributedString: AttributedString, startsInsideBlock: Bool = false) {
     self.attributedString = attributedString
+    self.startsInsideBlock = startsInsideBlock
   }
 }
 
@@ -376,6 +383,31 @@ extension Formatter.InlineNode {
 
 extension AttributedString {
   fileprivate var blockNodes: [Formatter.BlockNode] {
-    self.blocks.compactMap(\.blockNode)
+    let blocks = self.blocks
+
+    // Text from inside a single block, such as a few words of a list item, stands on its own:
+    // the list marker, quote, or table around the block frames the whole block, not the text.
+    if let block = blocks.soleLeaf, let leaf = block.leaf {
+      // Table cells have no block node of their own outside their table
+      return [block.blockNode ?? .paragraph(children: leaf.inlineNodes)]
+    }
+
+    return blocks.compactMap(\.blockNode)
+  }
+}
+
+extension Array where Element == Formatter.Block {
+  /// The only leaf block in these block trees, when there is exactly one.
+  fileprivate var soleLeaf: Formatter.Block? {
+    guard count == 1, let block = first else {
+      return nil
+    }
+
+    switch block.kind {
+    case .leaf:
+      return block
+    case .container(let container):
+      return container.children.soleLeaf
+    }
   }
 }

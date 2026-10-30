@@ -173,6 +173,8 @@ struct PlainTextFormatterTests {
       NSAttributedString(
         markdown: """
           > This is a quote.
+          >
+          > It has two paragraphs.
           """
       )
     )
@@ -181,7 +183,7 @@ struct PlainTextFormatterTests {
     let result = formatter.plainText()
 
     // then
-    #expect(result == "  This is a quote.")
+    #expect(result == "  This is a quote.\n\n  It has two paragraphs.")
   }
 
   @Test func blockQuoteWithParagraphs() throws {
@@ -365,5 +367,231 @@ struct PlainTextFormatterTests {
 
     // then
     #expect(result == "")
+  }
+
+  // MARK: - Partial selections
+
+  @Test func textInsideUnorderedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "cond it",
+      in: """
+        * First item
+        * Second item
+        * Third item
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "cond it")
+  }
+
+  @Test func textInsideOrderedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "cond it",
+      in: """
+        1. First item
+        2. Second item
+        3. Third item
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "cond it")
+  }
+
+  @Test func firstWordOfListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "Second",
+      in: """
+        1. First item
+        2. Second item
+        """
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "Second")
+  }
+
+  @Test func textInsideNestedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "sted item",
+      in: """
+        - First item
+          - Nested item 1
+        - Second item
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "sted item")
+  }
+
+  @Test func textInsideBlockQuote() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "is a",
+      in: """
+        > This is a quote.
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "is a")
+  }
+
+  @Test func textInsideTableCell() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "one, two",
+      in: """
+        | Key | Value |
+        | --- | --- |
+        | Tags | one, two |
+        """
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "one, two")
+  }
+
+  @Test func textInsideCodeBlockInListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "let x = 1",
+      in: """
+        - Item
+
+          ```
+          let x = 1
+          ```
+        """
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "let x = 1")
+  }
+
+  @Test func selectionStartingInsideUnorderedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "cond itemThird item",
+      in: """
+        * First item
+        * Second item
+        * Third item
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "cond item\n  • Third item")
+  }
+
+  @Test func selectionStartingInsideOrderedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "cond itemThird it",
+      in: """
+        1. First item
+        2. Second item
+        3. Third item
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "cond item\n  3. Third it")
+  }
+
+  @Test func selectionStartingInsideNestedListItem() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "sted item 1Nested item 2Second item",
+      in: """
+        - First item
+          - Nested item 1
+          - Nested item 2
+        - Second item
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "sted item 1\n    • Nested item 2\n  • Second item")
+  }
+
+  @Test func selectionStartingAtListItemStart() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "Second itemThird item",
+      in: """
+        1. First item
+        2. Second item
+        3. Third item
+        """
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "  2. Second item\n  3. Third item")
+  }
+
+  @Test func selectionStartingInsideBlockQuote() throws {
+    // given
+    let formatter = try Formatter(
+      selecting: "quote.Second paragraph.",
+      in: """
+        > This is a quote.
+        >
+        > Second paragraph.
+        """,
+      startsInsideBlock: true
+    )
+
+    // when
+    let result = formatter.plainText()
+
+    // then
+    #expect(result == "quote.\n\n  Second paragraph.")
   }
 }

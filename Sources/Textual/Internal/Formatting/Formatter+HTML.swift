@@ -2,7 +2,7 @@ import Foundation
 
 extension Formatter {
   func html() -> String {
-    blockNodes.renderHTML()
+    blockNodes.renderHTML(startsInsideBlock: startsInsideBlock)
   }
 }
 
@@ -47,7 +47,7 @@ extension Array where Element == Formatter.InlineNode {
 // MARK: - Block rendering
 
 extension Formatter.BlockNode {
-  fileprivate func renderHTML() -> String {
+  fileprivate func renderHTML(startsInsideBlock: Bool = false) -> String {
     switch self {
     case .paragraph(let children):
       return "<p>\(children.renderHTML())</p>"
@@ -55,11 +55,15 @@ extension Formatter.BlockNode {
       let l = max(1, min(6, level))
       return "<h\(l)>\(children.renderHTML())</h\(l)>"
     case .orderedList(let children):
-      let start = children.map(\.ordinal).min() ?? 1
-      let startAttribute = start > 1 ? #" start="\#(start)""# : ""
-      return "<ol\(startAttribute)>\n\(children.renderHTML())\n</ol>"
+      return children.renderHTML(startsInsideBlock: startsInsideBlock) { items in
+        let start = items.map(\.ordinal).min() ?? 1
+        let startAttribute = start > 1 ? #" start="\#(start)""# : ""
+        return "<ol\(startAttribute)>\n\(items.renderHTML())\n</ol>"
+      }
     case .unorderedList(let children):
-      return "<ul>\n\(children.renderHTML())\n</ul>"
+      return children.renderHTML(startsInsideBlock: startsInsideBlock) { items in
+        "<ul>\n\(items.renderHTML())\n</ul>"
+      }
     case .codeBlock(let languageHint, let code):
       let classAttribute =
         languageHint.flatMap {
@@ -69,7 +73,8 @@ extension Formatter.BlockNode {
         } ?? ""
       return "<pre><code\(classAttribute)>\(code.htmlCodeEscaped())</code></pre>"
     case .blockQuote(let children):
-      return "<blockquote>\n\(children.renderHTML())\n</blockquote>"
+      return
+        "<blockquote>\n\(children.renderHTML(startsInsideBlock: startsInsideBlock))\n</blockquote>"
     case .table(let columns, let children):
       guard let headerHTML = children.first?.renderHeaderHTML(columns: columns) else {
         return "<table></table>"
@@ -88,9 +93,9 @@ extension Formatter.BlockNode {
 }
 
 extension Array where Element == Formatter.BlockNode {
-  fileprivate func renderHTML() -> String {
-    self.map {
-      $0.renderHTML()
+  fileprivate func renderHTML(startsInsideBlock: Bool = false) -> String {
+    self.enumerated().map { index, block in
+      block.renderHTML(startsInsideBlock: startsInsideBlock && index == 0)
     }.joined(separator: "\n")
   }
 }
@@ -171,6 +176,25 @@ extension Array where Element == Formatter.ListItem {
     self.map {
       $0.renderHTML()
     }.joined(separator: "\n")
+  }
+
+  /// Renders the items as the list `renderList` builds. When the text starts inside the first
+  /// item, that item started before the text did: its content goes ahead of the list, so no
+  /// marker is drawn for it.
+  fileprivate func renderHTML(
+    startsInsideBlock: Bool,
+    renderList: ([Formatter.ListItem]) -> String
+  ) -> String {
+    guard startsInsideBlock, let first else {
+      return renderList(self)
+    }
+
+    let leadingHTML = first.blocks.renderHTML(startsInsideBlock: true)
+    let remainingItems = Array(dropFirst())
+
+    return remainingItems.isEmpty
+      ? leadingHTML
+      : "\(leadingHTML)\n\(renderList(remainingItems))"
   }
 }
 

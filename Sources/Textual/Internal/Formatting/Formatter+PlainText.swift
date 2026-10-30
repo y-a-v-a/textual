@@ -2,7 +2,7 @@ import Foundation
 
 extension Formatter {
   func plainText() -> String {
-    blockNodes.renderPlainText()
+    blockNodes.renderPlainText(startsInsideBlock: startsInsideBlock)
   }
 }
 
@@ -41,22 +41,34 @@ extension Array where Element == Formatter.InlineNode {
 
 // MARK: - Block rendering
 
+// When the text starts inside a block, the first line continues a line that began before the text
+// did, so nothing that leads that line (indentation, list markers) is part of the text.
+
 extension Formatter.BlockNode {
-  fileprivate func renderPlainText(indentationLevel: Int, tightSpacing: Bool) -> String {
+  fileprivate func renderPlainText(
+    indentationLevel: Int,
+    tightSpacing: Bool,
+    startsInsideBlock: Bool
+  ) -> String {
     switch self {
     case .paragraph(let children):
-      return children.renderPlainText().indented(indentationLevel)
+      return children.renderPlainText()
+        .indented(indentationLevel, skippingFirstLine: startsInsideBlock)
     case .header(_, let children):
-      return children.renderPlainText().indented(indentationLevel)
+      return children.renderPlainText()
+        .indented(indentationLevel, skippingFirstLine: startsInsideBlock)
     case .orderedList(let children):
-      return children.renderOrderedPlainText(indentationLevel: indentationLevel + 1)
+      return children.renderOrderedPlainText(
+        indentationLevel: indentationLevel + 1, startsInsideBlock: startsInsideBlock)
     case .unorderedList(let children):
-      return children.renderUnorderedPlainText(indentationLevel: indentationLevel + 1)
+      return children.renderUnorderedPlainText(
+        indentationLevel: indentationLevel + 1, startsInsideBlock: startsInsideBlock)
     case .codeBlock(_, let code):
-      return code.indented(indentationLevel)
+      return code.indented(indentationLevel, skippingFirstLine: startsInsideBlock)
     case .blockQuote(let children):
       return children.renderPlainText(
-        indentationLevel: indentationLevel + 1, tightSpacing: tightSpacing)
+        indentationLevel: indentationLevel + 1, tightSpacing: tightSpacing,
+        startsInsideBlock: startsInsideBlock)
     case .table(_, let children):
       return children.renderPlainText(indentationLevel: indentationLevel)
     case .thematicBreak:
@@ -66,11 +78,15 @@ extension Formatter.BlockNode {
 }
 
 extension Array where Element == Formatter.BlockNode {
-  fileprivate func renderPlainText(indentationLevel: Int = 0, tightSpacing: Bool = false)
-    -> String
-  {
-    self.map {
-      $0.renderPlainText(indentationLevel: indentationLevel, tightSpacing: tightSpacing)
+  fileprivate func renderPlainText(
+    indentationLevel: Int = 0,
+    tightSpacing: Bool = false,
+    startsInsideBlock: Bool = false
+  ) -> String {
+    self.enumerated().map { index, block in
+      block.renderPlainText(
+        indentationLevel: indentationLevel, tightSpacing: tightSpacing,
+        startsInsideBlock: startsInsideBlock && index == 0)
     }.joined(separator: tightSpacing ? "\n" : "\n\n")
   }
 }
@@ -98,41 +114,68 @@ extension Array where Element == Formatter.TableRow {
 // MARK: - List rendering
 
 extension Formatter.ListItem {
-  fileprivate func renderOrderedPlainText(indentationLevel: Int) -> String {
-    blocks
-      .renderPlainText(indentationLevel: indentationLevel, tightSpacing: true)
-      .prefixed(with: "\(ordinal). ", indentationLevel: indentationLevel)
+  fileprivate func renderOrderedPlainText(indentationLevel: Int, startsInsideBlock: Bool)
+    -> String
+  {
+    renderPlainText(
+      marker: "\(ordinal). ", indentationLevel: indentationLevel,
+      startsInsideBlock: startsInsideBlock)
   }
 
-  fileprivate func renderUnorderedPlainText(indentationLevel: Int) -> String {
-    blocks
-      .renderPlainText(indentationLevel: indentationLevel, tightSpacing: true)
-      .prefixed(with: "• ", indentationLevel: indentationLevel)
+  fileprivate func renderUnorderedPlainText(indentationLevel: Int, startsInsideBlock: Bool)
+    -> String
+  {
+    renderPlainText(
+      marker: "• ", indentationLevel: indentationLevel, startsInsideBlock: startsInsideBlock)
+  }
+
+  private func renderPlainText(marker: String, indentationLevel: Int, startsInsideBlock: Bool)
+    -> String
+  {
+    let text = blocks.renderPlainText(
+      indentationLevel: indentationLevel, tightSpacing: true, startsInsideBlock: startsInsideBlock)
+
+    // The item started before the text did, so its marker is not part of it
+    guard !startsInsideBlock else {
+      return text
+    }
+
+    return text.prefixed(with: marker, indentationLevel: indentationLevel)
   }
 }
 
 extension Array where Element == Formatter.ListItem {
-  fileprivate func renderOrderedPlainText(indentationLevel: Int) -> String {
-    self.map {
-      $0.renderOrderedPlainText(indentationLevel: indentationLevel)
+  fileprivate func renderOrderedPlainText(indentationLevel: Int, startsInsideBlock: Bool)
+    -> String
+  {
+    self.enumerated().map { index, item in
+      item.renderOrderedPlainText(
+        indentationLevel: indentationLevel, startsInsideBlock: startsInsideBlock && index == 0)
     }.joined(separator: "\n")
   }
 
-  fileprivate func renderUnorderedPlainText(indentationLevel: Int) -> String {
-    self.map {
-      $0.renderUnorderedPlainText(indentationLevel: indentationLevel)
+  fileprivate func renderUnorderedPlainText(indentationLevel: Int, startsInsideBlock: Bool)
+    -> String
+  {
+    self.enumerated().map { index, item in
+      item.renderUnorderedPlainText(
+        indentationLevel: indentationLevel, startsInsideBlock: startsInsideBlock && index == 0)
     }.joined(separator: "\n")
   }
 }
 
 extension String {
-  fileprivate func indented(_ level: Int) -> String {
+  fileprivate func indented(_ level: Int, skippingFirstLine: Bool = false) -> String {
     guard level > 0 else { return self }
 
+    let indent = String(repeating: "  ", count: level)
     let indented =
       self
       .split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
-      .map { String(repeating: "  ", count: level) + $0 }
+      .enumerated()
+      .map { index, line in
+        skippingFirstLine && index == 0 ? String(line) : indent + line
+      }
       .joined(separator: "\n")
     return self.hasSuffix("\n") ? indented + "\n" : indented
   }

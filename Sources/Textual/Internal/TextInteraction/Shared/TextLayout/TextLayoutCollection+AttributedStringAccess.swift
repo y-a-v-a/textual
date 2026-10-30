@@ -6,6 +6,17 @@
       layouts.map(\.attributedString.length).reduce(0, +)
     }
 
+    /// Whether the text in `range` starts partway through a layout rather than at its start.
+    func startsInsideLayout(_ range: TextRange) -> Bool {
+      guard !range.isCollapsed else { return false }
+
+      let lowerBound = localCharacterIndex(at: range.start)
+      let length = layouts[range.start.indexPath.layout].attributedString.length
+
+      // A range that starts at the very end of a layout takes no text from it
+      return lowerBound > 0 && lowerBound < length
+    }
+
     func attributedText(in range: TextRange) -> NSAttributedString {
       guard !range.isCollapsed else { return NSAttributedString() }
 
