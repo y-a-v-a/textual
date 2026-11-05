@@ -89,8 +89,14 @@ extension PatternTokenizer.Pattern {
     .init(regex: /(?s)\$\$(.+?)\$\$/, tokenType: .mathBlock)
   }
 
+  // Pandoc's `tex_math_dollars` rules, so prose like "costs $5 and $10" stays text: the
+  // opening `$` must not be followed by whitespace, the closing `$` must not be preceded by
+  // whitespace (or a backslash, which escapes it) and must not be followed by a digit.
   static var mathInline: Self {
-    .init(regex: /\$(?!\$)((?:\\\$|[^$\n])+)\$/, tokenType: .mathInline)
+    .init(
+      regex: /\$(?![\s$])((?:\\\$|[^$\n])*?(?:\\\$|[^\s$\\]))\$(?!\d)/,
+      tokenType: .mathInline
+    )
   }
 }
 
