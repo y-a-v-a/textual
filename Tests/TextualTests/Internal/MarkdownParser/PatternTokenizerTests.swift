@@ -178,7 +178,7 @@ struct PatternTokenizerTests {
       "Between $ 5 and 10 $ now",
       "From $x$5 onward",
     ] {
-      #expect(tokenizer.tokenize(text) == [.init(type: .text, content: text)], "\(text)")
+      #expect(try tokenizer.tokenize(text) == [.init(type: .text, content: text)], "\(text)")
     }
   }
 
