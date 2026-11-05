@@ -47,7 +47,11 @@ The divergence lies in four areas:
 - **Fixes** — list item spacing reacts to environment changes, escaped task list markers stay
   literal instead of turning into checkboxes, text selection lets go of the previous layout
   when the content becomes empty, and copying part of a list item, quote, or table cell copies
-  only the selected text, without the list marker or number in front of it.
+  only the selected text, without the list marker or number in front of it. Math expressions reach
+  the typesetter as written, so `\,`, `\{`, `a*b*c`, and multi-line `$$` blocks survive Markdown
+  parsing, while prose like "$5 and $10" stays text. Math rendering comes from a
+  [fork of swiftui-math](https://github.com/y-a-v-a/swiftui-math) that fixes scripted letters such
+  as `$r^2$`, including in PDF output.
 - **Open upstream pull requests** — fixes still under review upstream, merged here and adapted to
   the fork where they overlap with it: content that is there on the first layout pass, so `List`
   rows keep their height and `ImageRenderer` draws text

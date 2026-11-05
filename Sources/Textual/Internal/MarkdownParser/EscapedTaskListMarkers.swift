@@ -88,7 +88,7 @@ enum EscapedTaskListMarkers {
 }
 
 extension PresentationIntent {
-  fileprivate var isCodeBlock: Bool {
+  var isCodeBlock: Bool {
     guard case .codeBlock = components.first?.kind else {
       return false
     }

@@ -11,6 +11,7 @@ public struct AttributedStringMarkdownParser: MarkupParser {
   private let baseURL: URL?
   private let options: AttributedString.MarkdownParsingOptions
   private let processor: PatternProcessor
+  private let protectsMathSource: Bool
 
   public init(
     baseURL: URL?,
@@ -20,9 +21,15 @@ public struct AttributedStringMarkdownParser: MarkupParser {
     self.baseURL = baseURL
     self.options = options
     self.processor = PatternProcessor(syntaxExtensions: syntaxExtensions)
+    self.protectsMathSource = syntaxExtensions.contains(where: \.protectsMathSource)
   }
 
   public func attributedString(for input: String) throws -> AttributedString {
+    let input =
+      protectsMathSource && MathSource.mayContain(input)
+      ? try MathSource.protect(in: input, options: self.options)
+      : input
+
     // Escaped task list markers (`\[ ]`) parse to the same text as real ones, so they can
     // only be told apart through source positions while the source is still at hand
     var options = self.options

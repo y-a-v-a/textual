@@ -9,6 +9,8 @@ extension AttributedStringMarkdownParser {
         _ token: PatternTokenizer.Token,
         _ attributes: AttributeContainer
       ) -> AttributedString?
+    /// Whether math expressions in the source must reach `replace` as written.
+    var protectsMathSource = false
   }
 }
 
@@ -39,16 +41,20 @@ extension AttributedStringMarkdownParser.SyntaxExtension {
 
   /// Replaces inline and block math expressions with attachments.
   public static var math: Self {
-    .init(patterns: [.mathBlock, .mathInline]) { token, attributes in
-      guard let latex = token.capturedContent else {
-        return nil
-      }
+    .init(
+      patterns: [.mathBlock, .mathInline],
+      replace: { token, attributes in
+        guard let latex = token.capturedContent else {
+          return nil
+        }
 
-      let attachment = MathAttachment(
-        latex: latex,
-        style: token.type == .mathBlock ? .block : .inline
-      )
-      return AttributedString("\u{FFFC}", attributes: attributes.attachment(.init(attachment)))
-    }
+        let attachment = MathAttachment(
+          latex: latex,
+          style: token.type == .mathBlock ? .block : .inline
+        )
+        return AttributedString("\u{FFFC}", attributes: attributes.attachment(.init(attachment)))
+      },
+      protectsMathSource: true
+    )
   }
 }
