@@ -19,7 +19,19 @@
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
-    private var dragStart: TextPosition?
+    /// The unit a mouse drag extends the selection by, set by the click count of the mouse-down
+    /// that starts it, as in `NSTextView`.
+    private enum DragGranularity {
+      case character
+      case word
+      case block
+    }
+
+    /// The range the mouse-down selected, which a drag keeps selected while it extends the
+    /// selection: a collapsed range for a single click, the word or the block for a double or
+    /// triple click.
+    private var dragAnchor: TextRange?
+    private var dragGranularity: DragGranularity = .character
     private var selectionAnchor: TextPosition?
 
     init(
@@ -56,6 +68,8 @@
       window?.makeFirstResponder(self)
       let location = convert(event.locationInWindow, from: nil)
 
+      dragAnchor = nil
+
       switch event.clickCount {
       case 1:
         if let url = model.url(for: location) {
@@ -63,39 +77,64 @@
         } else {
           resetSelection()
         }
-        dragStart = model.closestPosition(to: location)
+        dragGranularity = .character
+        dragAnchor = model.closestPosition(to: location).map {
+          TextRange(start: $0, end: $0)
+        }
       case 2:
+        // Holding the second click and dragging (or a double-tap drag on a trackpad) extends
+        // the selection word by word
+        dragGranularity = .word
         if let position = model.closestPosition(to: location) {
           model.selectedRange = model.wordRange(for: position)
+          dragAnchor = model.selectedRange
         }
-        dragStart = nil
       case 3:
+        dragGranularity = .block
         if let position = model.closestPosition(to: location) {
           model.selectedRange = model.blockRange(for: position)
+          dragAnchor = model.selectedRange
         }
-        dragStart = nil
       default:
         break
       }
     }
 
     override func mouseDragged(with event: NSEvent) {
-      guard let dragStart else {
+      guard let dragAnchor else {
         return
       }
 
       let location = convert(event.locationInWindow, from: nil)
 
-      guard let currentPosition = model.closestPosition(to: location) else {
+      guard let position = model.closestPosition(to: location) else {
         return
       }
 
-      model.selectedRange = TextRange(from: dragStart, to: currentPosition)
+      // The unit of text under the pointer, at the drag's granularity
+      let collapsed = TextRange(start: position, end: position)
+      let extent =
+        switch dragGranularity {
+        case .character: collapsed
+        case .word: model.wordRange(for: position) ?? collapsed
+        case .block: model.blockRange(for: position) ?? collapsed
+        }
+
+      // Keep the anchor selected and grow towards the pointer, so the end the drag moves is
+      // the one Shift-arrow keys move afterwards
+      if position < dragAnchor.start {
+        model.selectedRange = TextRange(start: extent.start, end: dragAnchor.end)
+        selectionAnchor = dragAnchor.end
+      } else {
+        model.selectedRange = TextRange(
+          start: dragAnchor.start, end: max(extent.end, dragAnchor.end))
+        selectionAnchor = dragAnchor.start
+      }
       autoscroll(with: event)
     }
 
     override func mouseUp(with event: NSEvent) {
-      dragStart = nil
+      dragAnchor = nil
     }
 
     override func rightMouseDown(with event: NSEvent) {
