@@ -4,10 +4,10 @@ extension StructuredText {
   struct TableCell: View {
     @Environment(\.tableCellStyle) private var tableCellStyle
 
-    private let content: AttributedSubstring
+    private let content: Content
     private let identifier: TableCell.Identifier
 
-    init(_ content: AttributedSubstring, row: Int, column: Int) {
+    init(_ content: Content, row: Int, column: Int) {
       self.content = content
       self.identifier = .init(row: row, column: column)
     }
@@ -15,7 +15,7 @@ extension StructuredText {
     var body: some View {
       let configuration = TableCellStyleConfiguration(
         label: .init(label),
-        indentationLevel: indentationLevel,
+        indentationLevel: content.indentationLevel,
         row: identifier.row,
         column: identifier.column
       )
@@ -30,13 +30,22 @@ extension StructuredText {
     }
 
     private var label: some View {
-      WithInlineStyle(AttributedString(content)) {
+      WithInlineStyle(content.text) {
         TextFragment($0)
       }
     }
+  }
+}
 
-    private var indentationLevel: Int {
-      content.presentationIntent?.indentationLevel ?? 0
+extension StructuredText.TableCell {
+  // A cell's text and indentation level, derived once when the table's content changes
+  struct Content: Equatable {
+    let text: AttributedString
+    let indentationLevel: Int
+
+    init(_ content: AttributedSubstring) {
+      self.text = AttributedString(content)
+      self.indentationLevel = content.runs.first?.presentationIntent?.indentationLevel ?? 0
     }
   }
 }
@@ -70,11 +79,8 @@ extension StructuredText.TableCell {
     }
   }
 
-  struct SpacingKey: PreferenceKey {
-    static let defaultValue = Spacing()
+}
 
-    static func reduce(value: inout Spacing, nextValue: () -> Spacing) {
-      value = nextValue()
-    }
-  }
+extension EnvironmentValues {
+  @Entry var tableCellSpacing = StructuredText.TableCell.Spacing()
 }
