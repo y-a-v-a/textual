@@ -168,13 +168,17 @@ extension TextualNamespace where Base: View {
   }
 
   /// Sets the spacing used between table cells in ``StructuredText``.
+  ///
+  /// Apply it to the table's label, or to a view that contains it, from a custom
+  /// ``StructuredText/TableStyle``. Applied to a ``StructuredText``, it sets the spacing for
+  /// every table whose style does not set its own.
   public func tableCellSpacing(
     horizontal: CGFloat? = nil,
     vertical: CGFloat? = nil
   ) -> some View {
-    base.preference(
-      key: StructuredText.TableCell.SpacingKey.self,
-      value: .init(horizontal: horizontal, vertical: vertical)
+    base.environment(
+      \.tableCellSpacing,
+      .init(horizontal: horizontal, vertical: vertical)
     )
   }
 

@@ -17,24 +17,45 @@
       let document = Self.proseDocument(sections: 120)
       print("BENCH document-size-bytes \(document.utf8.count)")
 
-      initialRender(document, selection: false, label: "initial-render")
-      quiesce()
-      initialRender(document, selection: true, label: "initial-render-selection")
-      quiesce()
-      streaming(document, steps: 80)
-      quiesce()
-      streamingCode(steps: 40)
-      quiesce()
-      spacingChurn(document, selection: false, label: "spacing-churn")
-      quiesce()
-      spacingChurn(document, selection: true, label: "spacing-churn-selection")
-      quiesce()
+      await initialRender(document, selection: false, label: "initial-render")
+      await quiesce()
+      await initialRender(document, selection: true, label: "initial-render-selection")
+      await quiesce()
+      await streaming(document, steps: 80)
+      await quiesce()
+      await streamingCode(steps: 40)
+      await quiesce()
+      await spacingChurn(document, selection: false, label: "spacing-churn")
+      await quiesce()
+      await spacingChurn(document, selection: true, label: "spacing-churn-selection")
+      await quiesce()
       await tokenizer(snippets: 40)
+    }
+
+    // Table-only scenarios. Run alone with `--filter TextualBenchmarks/tableBenchmarks`.
+    @Test func tableBenchmarks() async throws {
+      let document = Self.tableDocument(tables: 24, rows: 24)
+      print("BENCH table-document-size-bytes \(document.utf8.count)")
+
+      await initialRender(document, selection: false, label: "table-initial-render")
+      await quiesce()
+      await initialRender(document, selection: true, label: "table-initial-render-selection")
+      await quiesce()
+      await initialRender(
+        Self.tableDocument(tables: 1, rows: 400), selection: false,
+        label: "table-large-initial-render"
+      )
+      await quiesce()
+      await streaming(document, steps: 40, label: "table-streaming")
+      await quiesce()
+      await streamingTableRows(rows: 120)
+      await quiesce()
+      await spacingChurn(document, selection: false, label: "table-spacing-churn")
     }
 
     // MARK: - Scenarios
 
-    private func initialRender(_ document: String, selection: Bool, label: String) {
+    private func initialRender(_ document: String, selection: Bool, label: String) async {
       for iteration in 1...3 {
         var host: BenchmarkHost?
         let duration = ContinuousClock().measure {
@@ -42,35 +63,36 @@
           host?.layout()
         }
         report(label, iteration: iteration, duration)
-        host?.settle(0.3)
+        await host?.settle(0.3)
         host = nil
-        quiesce()
+        await quiesce()
       }
     }
 
-    private func streaming(_ document: String, steps: Int) {
+    private func streaming(_ document: String, steps: Int, label: String = "streaming") async {
       let sections = document.components(separatedBy: "\n\n")
+      let clock = ContinuousClock()
       let host = BenchmarkHost(.init(markdown: ""))
-      host.settle(0.2)
+      await host.settle(0.2)
 
-      let feed = ContinuousClock().measure {
+      let feed = await measure(clock) {
         for step in 1...steps {
           let count = sections.count * step / steps
           host.set(.init(markdown: sections.prefix(count).joined(separator: "\n\n")))
           host.layout()
-          host.spin(0.005)
+          await host.spin(0.005)
         }
       }
       // A trailing settle bounded the same way on every revision, so coalesced parses land
-      let total = feed + ContinuousClock().measure { host.settle(0.7) }
+      let total = await feed + measure(clock) { await host.settle(0.7) }
 
-      report("streaming-feed", feed)
-      report("streaming-total", total)
+      report("\(label)-feed", feed)
+      report("\(label)-total", total)
     }
 
     // Streaming a document full of fenced code re-runs asynchronous tokenization per chunk;
     // the longer settle gives queued tokenization a bounded window to drain
-    private func streamingCode(steps: Int) {
+    private func streamingCode(steps: Int) async {
       let sections = (0..<60).map { index in
         """
         ### Listing \(index)
@@ -84,29 +106,52 @@
         ```
         """
       }
+      let clock = ContinuousClock()
       let host = BenchmarkHost(.init(markdown: ""))
-      host.settle(0.2)
+      await host.settle(0.2)
 
-      let feed = ContinuousClock().measure {
+      let feed = await measure(clock) {
         for step in 1...steps {
           let count = sections.count * step / steps
           host.set(.init(markdown: sections.prefix(count).joined(separator: "\n\n")))
           host.layout()
-          host.spin(0.005)
+          await host.spin(0.005)
         }
       }
-      let total = feed + ContinuousClock().measure { host.settle(2.0) }
+      let total = await feed + measure(clock) { await host.settle(2.0) }
 
       report("streaming-code-feed", feed)
       report("streaming-code-total", total)
     }
 
-    private func spacingChurn(_ document: String, selection: Bool, label: String) {
+    // A chat-style stream that appends one row at a time to a single growing table
+    private func streamingTableRows(rows: Int) async {
+      let table = Self.tableDocument(tables: 1, rows: rows).components(separatedBy: "\n")
+      let header = table.prefix(6)  // heading, blank, paragraph, blank, header row, delimiter
+      let body = table.dropFirst(6)
+      let clock = ContinuousClock()
+      let host = BenchmarkHost(.init(markdown: ""))
+      await host.settle(0.2)
+
+      let feed = await measure(clock) {
+        for count in 1...body.count {
+          host.set(.init(markdown: (header + body.prefix(count)).joined(separator: "\n")))
+          host.layout()
+          await host.spin(0.005)
+        }
+      }
+      let total = await feed + measure(clock) { await host.settle(0.7) }
+
+      report("table-row-streaming-feed", feed)
+      report("table-row-streaming-total", total)
+    }
+
+    private func spacingChurn(_ document: String, selection: Bool, label: String) async {
       let host = BenchmarkHost(.init(markdown: document, selectionEnabled: selection))
       host.layout()
-      host.settle(0.5)
+      await host.settle(0.5)
 
-      let duration = ContinuousClock().measure {
+      let duration = await measure(ContinuousClock()) {
         for toggle in 1...16 {
           host.set(
             .init(
@@ -116,7 +161,7 @@
             )
           )
           host.layout()
-          host.spin(0.02)
+          await host.spin(0.02)
           host.layout()
         }
       }
@@ -144,10 +189,14 @@
       var second = Duration.zero
 
       for snippet in snippets {
-        first += await measure(clock) { _ = await tokenizer.tokenize(code: snippet, language: "swift") }
+        first += await measure(clock) {
+          _ = await tokenizer.tokenize(code: snippet, language: "swift")
+        }
       }
       for snippet in snippets {
-        second += await measure(clock) { _ = await tokenizer.tokenize(code: snippet, language: "swift") }
+        second += await measure(clock) {
+          _ = await tokenizer.tokenize(code: snippet, language: "swift")
+        }
       }
 
       report("tokenizer-first-pass", first)
@@ -170,8 +219,26 @@
       print("BENCH \(label)\(suffix) \(String(format: "%.1f", milliseconds))ms")
     }
 
-    private func quiesce() {
-      RunLoop.main.run(until: Date(timeIntervalSinceNow: 1.0))
+    private func quiesce() async {
+      await runMainActor(for: 1.0)
+    }
+
+    private static func tableDocument(tables: Int, rows: Int) -> String {
+      (0..<tables).map { table in
+        let body = (0..<rows).map { row in
+          "| `item-\(table)-\(row)` | Value **\(row * 7)** with *emphasis* | "
+            + "A [link](https://example.com/\(table)/\(row)) and some text that wraps | \(row) |"
+        }.joined(separator: "\n")
+        return """
+          ## Table \(table)
+
+          A short paragraph introducing table \(table).
+
+          | Name | Value | Description | # |
+          | ---- | :---: | ----------- | -: |
+          \(body)
+          """
+      }.joined(separator: "\n\n")
     }
 
     private static func proseDocument(sections: Int) -> String {
@@ -194,6 +261,24 @@
         """
       }.joined(separator: "\n\n")
     }
+  }
+
+  // Pumps the main run loop and yields to the main actor until `seconds` pass. Pumping alone
+  // doesn't run main-actor tasks: the benchmark itself is a main-actor job, so tasks queued
+  // behind it, such as the parse throttle's trailing parse or asynchronous code tokenization,
+  // only run when it suspends.
+  @MainActor
+  private func runMainActor(for seconds: TimeInterval, _ each: () -> Void = {}) async {
+    let deadline = Date(timeIntervalSinceNow: seconds)
+    repeat {
+      each()
+      pumpRunLoop(until: Date(timeIntervalSinceNow: 0.002))
+      await Task.yield()
+    } while Date() < deadline
+  }
+
+  private func pumpRunLoop(until date: Date) {
+    RunLoop.main.run(until: date)
   }
 
   @MainActor
@@ -220,15 +305,13 @@
       hostingView.layoutSubtreeIfNeeded()
     }
 
-    func spin(_ seconds: TimeInterval) {
-      RunLoop.main.run(until: Date(timeIntervalSinceNow: seconds))
+    func spin(_ seconds: TimeInterval) async {
+      await runMainActor(for: seconds)
     }
 
-    func settle(_ seconds: TimeInterval) {
-      let deadline = Date(timeIntervalSinceNow: seconds)
-      while Date() < deadline {
+    func settle(_ seconds: TimeInterval) async {
+      await runMainActor(for: seconds) {
         hostingView.layoutSubtreeIfNeeded()
-        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
       }
     }
   }

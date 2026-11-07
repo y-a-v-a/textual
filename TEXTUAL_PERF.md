@@ -64,6 +64,56 @@ Not yet done from the top tiers: the remaining §0 quick wins, §2.3 prefix sums
 §4.2 Prism off-main warm-up, §4.3 GIF timeline, §1.1 AnyView de-duplication, §1.3
 intent-identity ForEach ids, and the benchmark harness.
 
+> **Correction (2026-11-07): the streaming numbers above are inflated.** The harness spun
+> `RunLoop.main` from inside the `@MainActor` test, which never runs main-actor tasks: they
+> only run when the test suspends. So the throttle's cooldown task never ended, its first
+> parse was the only one, and every later chunk was dropped (async tokenization never ran
+> either). With the harness fixed to yield to the main actor (`perf/table-rendering`),
+> `streaming-feed` measures ~2.4 s rather than 662 ms. The throttle still helps against the
+> 10.9 s baseline, but by roughly 4–5×, not 16.6×. Re-measure the baseline before
+> quoting a figure.
+
+## Tables (2026-11-07, `perf/table-rendering`)
+
+Tables now have their own scenarios: `TextualBenchmarks/tableBenchmarks` (24 tables × 24
+rows ≈ 69 KB, one 400-row table, whole-table streaming, row-by-row streaming, spacing churn).
+
+Findings, from Time Profiler traces of those scenarios and a layout probe that logged every
+size proposal the grid made to its cells:
+
+1. **Cell spacing came from a preference round trip.** The style set the spacing as a
+   preference, `Table` copied it into `@State`, and the grid was then built again with the
+   new spacing. Every table laid out twice, and a single sizing pass (a `List` row
+   measurement, `ImageRenderer`) laid tables out without the style's spacing at all.
+   `tableCellSpacing` now writes to the environment, which the grid inside the label reads.
+   (Applied to a `StructuredText`, it now also sets the spacing for tables whose style sets
+   none.)
+2. **The grid laid every cell out again for each width it was proposed.** `BlockVStack`
+   measures the table at the container width, then the parent places the document at its
+   measured width, rounded to the pixel grid: 466.0 for a 466.152-wide table. A grid
+   proposed less than its ideal width shrinks a column below its ideal, so every cell was
+   measured again (with 0×0 and ∞ flexibility probes), and that pass wrapped a column. A
+   `TableFittingLayout` now proposes the grid its ideal (unspecified) width whenever the
+   table fits, with a 1 pt tolerance, so every fitting width hits the same grid cache.
+   Cell measurements per layout of a 4×4 table fell from 212 to 60.
+3. **Cells were derived per body evaluation.** Each `TableCell` copied its substring into a
+   fresh `AttributedString`. Cells are now derived once per content change, and a cell
+   whose content is unchanged keeps its previous value, so its view compares equal while a
+   table streams in.
+
+| Scenario (debug, 2 runs each) | `main` | branch | Change |
+| --- | --- | --- | --- |
+| 24 tables, initial render | 1250–1296 ms | 1081–1139 ms | −13% |
+| same, selection on | 1791–1879 ms | 1538–1660 ms | −13% |
+| 400-row table, initial render | 891–927 ms | 747–773 ms | −16% |
+| whole-table streaming, feed | 2557 / 2638 ms | 1627 / 1647 ms | −37% |
+| row-by-row streaming, feed | 1456 / 1428 ms | 1291 / 1286 ms | −10% |
+| spacing churn ×16 | 1977 / 1996 ms | 1880 / 1825 ms | −7% |
+
+The row-by-row feed is mostly the scenario's own idle time (≈0.47 s of CPU in 1.29 s).
+What remains in initial render is per-cell view setup that every block pays (style
+resolution, `AnyView` at the style boundary, fragment modifiers), not table-specific work.
+
 ---
 
 **Vocabulary**: F = fragments (paragraph/list item/table cell), R = attributed runs,
