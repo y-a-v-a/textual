@@ -10,7 +10,8 @@ import SwiftUI
 // actual attachment views are rendered in an overlay using the resolved Text.Layout
 // geometry. Three modifiers are applied at the fragment level:
 //
-// - TextSelectionBackground renders selection highlights on macOS
+// - TextSelectionBackground renders selection highlights on macOS, above any run background
+//   colors it takes over from the text (see TextBackground)
 // - AttachmentOverlay draws attachments at their run locations with selection-aware dimming
 // - TextLinkInteraction handles tap gestures on links
 //
@@ -33,8 +34,13 @@ import SwiftUI
 struct TextFragment<Content: AttributedStringProtocol>: View {
   @Environment(\.textEnvironment) private var textEnvironment
 
-  // Rebuilt when the content or the text environment (fonts, dynamic type, color scheme) changes
-  @State private var textBuilder = Memo<Tuple<Content, TextEnvironmentValues>, TextBuilder>()
+  #if TEXTUAL_ENABLE_TEXT_SELECTION && canImport(AppKit) && !targetEnvironment(macCatalyst)
+    @Environment(\.textSelection) private var textSelection
+  #endif
+
+  // Rebuilt when the content, the text environment (fonts, dynamic type, color scheme), or
+  // whether run backgrounds are lifted out of the text changes
+  @State private var textBuilder = Memo<Tuple<Content, TextEnvironmentValues, Bool>, TextBuilder>()
 
   // The container size last reported to a builder. A new builder starts from it, because the
   // container may not change size again to report it, such as when only the color scheme changes.
@@ -52,13 +58,17 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
   }
 
   var body: some View {
-    let (attachments, hasLinks, hasTextRunEffects) = inlineFeatures(content) {
+    let (attachments, hasLinks, hasTextRunEffects, hasBackgroundColors) = inlineFeatures(
+      content
+    ) {
       content.inlineFeatures()
     }
-    let builder = textBuilder(Tuple(content, textEnvironment)) {
+    let liftsBackgroundColors = hasBackgroundColors && paintsSelectionBehindText
+    let builder = textBuilder(Tuple(content, textEnvironment, liftsBackgroundColors)) {
       TextBuilder(
         content,
         containerSize: containerSize.wrappedValue,
+        liftsBackgroundColors: liftsBackgroundColors,
         environment: textEnvironment
       )
     }
@@ -78,9 +88,20 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
           }
       }
     }
-    .modifier(TextSelectionBackground())
+    .modifier(TextSelectionBackground(drawsTextBackgrounds: liftsBackgroundColors))
     .modifier(AttachmentOverlay(attachments: attachments))
     .modifier(TextLinkInteraction(hasLinks: hasLinks))
+  }
+
+  // On macOS the selection highlight is painted behind the text, where a background color drawn
+  // by the `Text` itself would cover it. Those backgrounds are then painted by
+  // TextSelectionBackground instead, below the highlight.
+  private var paintsSelectionBehindText: Bool {
+    #if TEXTUAL_ENABLE_TEXT_SELECTION && canImport(AppKit) && !targetEnvironment(macCatalyst)
+      textSelection.allowsSelection
+    #else
+      false
+    #endif
   }
 
   // The custom renderer is installed only where it earns its place. Fragments without effects
@@ -109,7 +130,8 @@ struct TextFragment<Content: AttributedStringProtocol>: View {
 }
 
 private typealias InlineFeatures = (
-  attachments: Set<AnyAttachment>, hasLinks: Bool, hasTextRunEffects: Bool
+  attachments: Set<AnyAttachment>, hasLinks: Bool, hasTextRunEffects: Bool,
+  hasBackgroundColors: Bool
 )
 
 struct TextFragmentAttribute: TextAttribute {

@@ -23,10 +23,20 @@ extension TextFragment {
     @ObservationIgnored let accessibilityLabel: String?
 
     @ObservationIgnored private let content: Content
+    @ObservationIgnored private let liftsBackgroundColors: Bool
     @ObservationIgnored private let cache: NSCache<KeyBox<[AttachmentKey: CGSize]>, Box<Text>>
 
     /// Creates a builder whose attachments are sized for `containerSize`, when it is known.
-    init(_ content: Content, containerSize: CGSize? = nil, environment: TextEnvironmentValues) {
+    ///
+    /// When `liftsBackgroundColors` is set, run background colors are carried as
+    /// `TextBackgroundAttribute` for `TextBackgroundView` to paint, instead of being drawn by
+    /// the `Text` itself.
+    init(
+      _ content: Content,
+      containerSize: CGSize? = nil,
+      liftsBackgroundColors: Bool = false,
+      environment: TextEnvironmentValues
+    ) {
       let attachmentSizes = content.attachmentSizes(
         for: containerSize.map { ProposedViewSize($0) } ?? .unspecified,
         in: environment
@@ -35,9 +45,11 @@ extension TextFragment {
       self.text = Text(
         attributedString: content,
         attachmentSizes: attachmentSizes,
+        liftsBackgroundColors: liftsBackgroundColors,
         in: environment
       )
       self.content = content
+      self.liftsBackgroundColors = liftsBackgroundColors
       self.accessibilityLabel = content.accessibilityLabel()
       self.cache = NSCache()
       self.cache.countLimit = 10
@@ -55,6 +67,7 @@ extension TextFragment {
         let text = Text(
           attributedString: content,
           attachmentSizes: attachmentSizes,
+          liftsBackgroundColors: liftsBackgroundColors,
           in: environment
         )
         cache.setObject(Box(text), forKey: cacheKey)
@@ -69,9 +82,10 @@ extension Text {
   fileprivate init(
     attributedString: some AttributedStringProtocol,
     attachmentSizes: [AttachmentKey: CGSize],
+    liftsBackgroundColors: Bool,
     in environment: TextEnvironmentValues
   ) {
-    // Only attachment placeholders and links need a `Text` of their own; every other run can be
+    // Only attachment placeholders, links, effects, and lifted backgrounds need a `Text` of their own; every other run can be
     // carried by the attributed string itself. Emitting one `Text` per run and concatenating
     // them builds a deep expression tree for richly formatted prose, so consecutive plain runs
     // are coalesced into a single `Text`.
@@ -88,8 +102,9 @@ extension Text {
       let link = run.link
       let attachment = run.textual.attachment
       let effect = run.textual.textRunEffect
+      let backgroundColor = liftsBackgroundColors ? run.attributes.swiftUI.backgroundColor : nil
 
-      guard link != nil || attachment != nil || effect != nil else {
+      guard link != nil || attachment != nil || effect != nil || backgroundColor != nil else {
         // Extend the pending plain span instead of emitting a `Text` for this run.
         plainRange = (plainRange?.lowerBound ?? run.range.lowerBound)..<run.range.upperBound
         continue
@@ -117,7 +132,15 @@ extension Text {
             )
           )
       } else {
-        text = Text(AttributedString(attributedString[run.range]))
+        var runString = AttributedString(attributedString[run.range])
+
+        // Painted by TextBackgroundView, below the selection highlight
+        if let backgroundColor {
+          runString.swiftUI.backgroundColor = nil
+          text = Text(runString).customAttribute(TextBackgroundAttribute(backgroundColor))
+        } else {
+          text = Text(runString)
+        }
       }
 
       // Add link attribute for TextLinkInteraction
