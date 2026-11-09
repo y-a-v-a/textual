@@ -27,11 +27,13 @@ extension AttributedStringProtocol {
   /// walking the runs once rather than once per lookup keeps that cost proportional to the
   /// fragment, not to the number of things asking about it.
   func inlineFeatures() -> (
-    attachments: Set<AnyAttachment>, hasLinks: Bool, hasTextRunEffects: Bool
+    attachments: Set<AnyAttachment>, hasLinks: Bool, hasTextRunEffects: Bool,
+    hasBackgroundColors: Bool
   ) {
     var attachments: Set<AnyAttachment> = []
     var hasLinks = false
     var hasTextRunEffects = false
+    var hasBackgroundColors = false
 
     for run in runs {
       if let attachment = run.attributes[keyPath: \.textual.attachment] {
@@ -43,9 +45,12 @@ extension AttributedStringProtocol {
       if run.attributes[keyPath: \.textual.textRunEffect] != nil {
         hasTextRunEffects = true
       }
+      if run.attributes[keyPath: \.swiftUI.backgroundColor] != nil {
+        hasBackgroundColors = true
+      }
     }
 
-    return (attachments, hasLinks, hasTextRunEffects)
+    return (attachments, hasLinks, hasTextRunEffects, hasBackgroundColors)
   }
 
   func containsValues<T>(for keyPaths: Set<KeyPath<AttributeContainer, T?>>) -> Bool {
